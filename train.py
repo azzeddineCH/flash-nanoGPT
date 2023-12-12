@@ -1,4 +1,5 @@
 import dataclasses
+import time
 
 from config import Config
 from data_loader import DataLoader
@@ -47,7 +48,6 @@ trainer = Trainer(
 
 train_state = trainer.make_train_state()
 
-
 train_loss = None
 valid_loss = None
 
@@ -59,9 +59,12 @@ if config.wandb:
     )
 
 for i in range(config.num_iters):
+
+    t0 = time.time()
     batch = next(train_data_loader)
-    step_rng_key = jax.random.fold_in(training_key, i)
+    step_rng_key = jax.jit(jax.random.fold_in)(training_key, i)
     train_state, iteration_loss = trainer.training_step(step_rng_key, train_state, batch)
+    step_time_s = time.time() - t0
 
     if i % config.eval_freq == 0:
         train_loss = valid_loss = 0
@@ -87,21 +90,17 @@ for i in range(config.num_iters):
         print(f"Iter {train_state.step} | Training Batch loss {train_loss} | Validation loss {valid_loss}")
 
         if config.wandb:
-            wandb.log(
-                {
-                    "train/loss": train_loss,
-                    "valid/loss": valid_loss
-                }
-            )
+            wandb.log({"train/loss": train_loss, "valid/loss": valid_loss})
 
     if i % config.log_freq == 0:
-        print(f"Iter {train_state.step} | loss {iteration_loss}")
+        print(
+            f"Iter {train_state.step} | "
+            f"loss {iteration_loss} | "
+            f"train time ms {step_time_s * 1000} | "
+        )
+
         if config.wandb:
-            wandb.log(
-                {
-                    "iter/loss": train_loss,
-                }
-            )
+            wandb.log({"iter/loss": train_loss})
 
 if config.wandb:
     wandb.finish()

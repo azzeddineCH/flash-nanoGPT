@@ -158,7 +158,7 @@ class GPT(nn.Module):
         # at call time, the embeddings params are passed to the layer apply method
         self.projection = nn.Dense(self.config.vocab_size, use_bias=self.config.use_bias, parent=None)
 
-    def __call__(self, x, *, train=True):
+    def __call__(self, x, *, train=True, top_k=None):
         batch, seq_length = x.shape
         assert seq_length <= self.config.block_size
 
@@ -167,6 +167,10 @@ class GPT(nn.Module):
         embeddings = self.dropout(embeddings, deterministic=not train)
         for block in self.blocks:
             embeddings = block(embeddings, train=train)
+
+        if top_k:
+            embeddings = embeddings[:, -top_k:, :]
+
         embeddings = self.layer_norm(embeddings)
 
         logits = self.projection.apply(
@@ -177,21 +181,36 @@ class GPT(nn.Module):
 
         return logits
 
+    def generate(self, rng_key, params, context, max_new_tokens, temperature=0.1):
+        for i in range(max_new_tokens):
+            token_key = jax.random.fold_in(rng_key, i)
+            trunc_context = context if context.shape[-1] <= self.config.block_size else \
+                context[:, -self.config.block_size:]
+            logits = self.apply({"params": params}, x=trunc_context, train=False, top_k=1)[:, -1, :]
+            next_token = jax.random.categorical(token_key, logits / temperature)
+            context = jnp.concatenate([context, next_token[..., None]], axis=-1)
+
+        return context
+
 
 if __name__ == '__main__':
     key = jax.random.PRNGKey(0)
 
     config = GPTConfig(
-        vocab_size=32,
-        num_layers=2,
-        num_heads=2,
-        embd_dim=16,
+        block_size=32,
+        num_layers=8,
+        num_heads=4,
+        embd_dim=128,
+        dropout_rate=0.0,
+        use_bias=False
     )
 
-    random_input = jax.random.randint(key, (1, 8), minval=0, maxval=config.vocab_size)
+    random_input = jax.random.randint(key, (2, 8), minval=0, maxval=config.vocab_size)
 
     model = GPT(config)
     state = model.init(key, x=random_input, train=False)
-    output = model.apply(state, x=random_input, train=True, rngs={"dropout": key})
+    output = model.apply(state, x=random_input, train=False)
 
     assert output.shape == random_input.shape + (config.vocab_size,)
+
+    tokens = jax.jit(model.generate, static_argnums=(3,))(key, state["params"], context=random_input, max_new_tokens=10)

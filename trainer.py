@@ -15,7 +15,7 @@ class Trainer:
         self.config = config
         self.vocab_size = vocab_size
         self.training_step = jax.jit(self._training_step) if config.jit else self._training_step
-        self.validation_step = jax.jit(self._validation_step) if config.jit else self._training_step
+        self.validation_step = jax.jit(self._validation_step) if config.jit else self._validation_step
 
     def _make_model(self):
         config = GPTConfig(

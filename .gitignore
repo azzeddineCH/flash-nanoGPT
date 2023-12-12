@@ -1,0 +1,5 @@
+**/*.bin
+**/*.txt
+wandb
+__pycache__/
+.
