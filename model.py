@@ -45,8 +45,8 @@ class CasualAttention(nn.Module):
         casual_mask = nn.make_causal_mask(x=jnp.ones((batch, self.num_heads, seq_length))).squeeze()
         masked_dot_product = jnp.where(casual_mask, dot_product, -jnp.inf)
 
-        # batch, num_head, seq_length, seq_length
-        attn_scores = jax.nn.softmax(masked_dot_product)
+        # todo: force masked_dot_product dtype to full precision when running on GPU
+        attn_scores = jax.nn.softmax(masked_dot_product)  # batch, num_head, seq_length, seq_length
         attn_scores = nn.Dropout(self.dropout_rate)(attn_scores, deterministic=not train)
 
         # batch, num_head, seq_length, embd_dim // num_heads
@@ -102,6 +102,7 @@ class AttentionBlock(nn.Module):
 
     @nn.compact
     def __call__(self, x, train=True):
+        # todo: force input dtype to float32 when running on GPU
         x_m = nn.LayerNorm(use_bias=self.use_bias, use_scale=True)(x)
 
         x = CasualAttention(
@@ -109,6 +110,7 @@ class AttentionBlock(nn.Module):
             proj_kernel_init_norm=self.proj_kernel_init_norm
         )(x_m, train=train) + x
 
+        # todo: force input dtype to float32 when running on GPU
         x_m = nn.LayerNorm(use_bias=self.use_bias, use_scale=True)(x)
 
         x = MLP(

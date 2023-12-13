@@ -1,12 +1,15 @@
 from typing import Tuple
 
 import optax
+from jax.random import PRNGKeyArray
 
 from config import Config
 from model import GPTConfig, GPT
 import jax
 
 from utils import Batch, TrainState
+import jmp
+from jax import numpy as jnp
 
 
 class Trainer:
@@ -16,6 +19,11 @@ class Trainer:
         self.vocab_size = vocab_size
         self.training_step = jax.jit(self._training_step) if config.jit else self._training_step
         self.validation_step = jax.jit(self._validation_step) if config.jit else self._validation_step
+        self.policy = jmp.Policy(
+            param_dtype=jnp.float32,
+            compute_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
+            output_dtype=jmp.half_dtype() if self.config.amp else jnp.float32
+        )
 
     def _make_model(self):
         config = GPTConfig(
@@ -29,7 +37,13 @@ class Trainer:
         )
 
         key = jax.random.PRNGKey(0)
-        random_input = jax.random.randint(key, (1, 8), minval=0, maxval=config.vocab_size)
+        random_input = jax.random.randint(
+            key,
+            (1, 8),
+            minval=0,
+            maxval=config.vocab_size,
+            dtype=jnp.int16 if self.config.amp else jnp.int32
+        )
         model = GPT(config)
         state = model.init(key, x=random_input, train=False)
 
@@ -59,33 +73,58 @@ class Trainer:
 
         optimizer = self._make_optimizer(params)
 
-        params = model_state["params"]
-        num_params = sum([a.size for a in jax.tree_util.tree_leaves(params)])
-
-        print(f"Train state created | model parameters : {num_params}")
-
-        return TrainState.create(
+        state = TrainState.create(
             apply_fn=model.apply,
-            params=model_state["params"],
-            num_params=num_params,
-            tx=optimizer
+            params=params,
+            tx=optimizer,
+            loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0 ** 16)) if self.config.amp else jmp.NoOpLossScale(),
+            skip_infinite=self.config.skip_infinite
         )
 
-    def _loss(self, rng_key, params, batch, apply_fn, train=True):
-        logits = apply_fn({"params": params}, x=batch.inputs, train=train, rngs={"dropout": rng_key})
+        print(f"Train state created | model parameters : {state.num_params}")
+
+        return state
+
+    def _loss(self, rng_key: PRNGKeyArray, params, state: TrainState, batch: Batch, train: bool = True):
+        """
+        calculate the batch loss following these steps:
+
+        1 - cast the input to half precision
+        2 - forward pass
+        3 - cast the output to full precision to handle softmax accumulation
+        4 - cast the loss back to half precision
+        5 - scale loss to avoid non representative grad values when backprop
+        """
+
+        params = self.policy.cast_to_compute(params)
+        inputs = batch.inputs.astype(jnp.int16 if self.config.amp else jnp.int32)
+
+        logits = state.apply_fn({"params": params}, x=inputs, train=train, rngs={"dropout": rng_key})
+        logits = self.policy.cast_to_output(logits)
+
         loss = optax.softmax_cross_entropy_with_integer_labels(
             logits=logits.reshape((-1, self.vocab_size)),
             labels=batch.labels.reshape(-1)
         ).mean()
 
-        return loss
+        if not train:
+            return loss
 
-    def _training_step(self, rng_key: jax.Array, state: TrainState, batch: Batch) -> Tuple[TrainState, float]:
-        batch_loss, grads = jax.value_and_grad(self._loss, argnums=1)(rng_key, state.params, batch, state.apply_fn)
-        state = state.apply_gradients(grads=grads)
+        loss = self.policy.cast_to_compute(loss)
+        return state.loss_scale.scale(loss)
 
-        return state, batch_loss
+    def _training_step(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch) -> Tuple[TrainState, float]:
+        batch_loss, grads = jax.value_and_grad(self._loss, argnums=1)(rng_key, state.params, state, batch, state)
+
+        # before unscaling the grads, cast them into full precision to avoid non representative values post unscaling
+        # this common when using GPUs float16 and less common when using TPUs bfloat16
+        grads = self.policy.cast_to_param(grads)
+        grads = state.loss_scale.unscale(grads)
+
+        state = state.apply_gradients(grads=grads, skip_infinite=self.config.skip_infinite)
+
+        return state, state.loss_scale.unscale(batch_loss)
 
     def _validation_step(self, rng_key: jax.Array, state: TrainState, batch: Batch):
-        batch_loss = self._loss(rng_key, state.params, batch, state.apply_fn, train=False)
+        batch_loss = self._loss(rng_key, state.params, state, batch, train=False)
         return batch_loss

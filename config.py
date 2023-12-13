@@ -34,5 +34,7 @@ class Config:
     beta2: float = 0.95
     grad_clip: float = 1.0
     # training
+    amp: bool = True
+    skip_infinite : bool = True
     device: str = "cpu"
     jit: bool = True

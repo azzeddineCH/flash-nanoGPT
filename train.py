@@ -20,7 +20,9 @@ config = Config(
     embd_dim=128,
     dropout_rate=0.0,
     jit=True,
-    wandb=False
+    wandb=False,
+    amp=False,
+    skip_infinite=False
 )
 
 data_rng_key, training_key, key = jax.random.split(key, 3)
