@@ -7,7 +7,7 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] GPT model in flax
 - [x] Core data pipeline
 - [x] Core training loop
-- [ ] Mixed precision training
+- [x] Mixed precision training
 - [ ] Gradient accumulation
 - [ ] Batch pre-fetching
 - [ ] Data sharding across GPUs/TPUs

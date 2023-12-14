@@ -22,7 +22,7 @@ config = Config(
     jit=True,
     wandb=False,
     amp=False,
-    skip_infinite=False
+    skip_infinite=True
 )
 
 data_rng_key, training_key, key = jax.random.split(key, 3)
@@ -65,7 +65,7 @@ for i in range(config.num_iters):
     t0 = time.time()
     batch = next(train_data_loader)
     step_rng_key = jax.jit(jax.random.fold_in)(training_key, i)
-    train_state, iteration_loss = trainer.training_step(step_rng_key, train_state, batch)
+    train_state, train_metrics = trainer.training_step(step_rng_key, train_state, batch)
     step_time_s = time.time() - t0
 
     if i % config.eval_freq == 0:
@@ -96,9 +96,11 @@ for i in range(config.num_iters):
 
     if i % config.log_freq == 0:
         print(
-            f"Iter {train_state.step} | "
-            f"loss {iteration_loss} | "
-            f"train time ms {step_time_s * 1000} | "
+            f"Iter: {train_state.step} | "
+            f"loss: {train_metrics.loss} | "
+            f"grads finite: {train_metrics.all_finite_grads} | "
+            f"loss scale: {train_state.loss_scale.loss_scale} | "
+            f"train time ms: {step_time_s * 1000} | "
         )
 
         if config.wandb:

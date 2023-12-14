@@ -25,6 +25,7 @@ class CasualAttention(nn.Module):
     num_heads: int = 8
     use_bias: bool = True
     proj_kernel_init_norm: float = 1.0
+    reduce_ops_dtype : jnp.dtype = jnp.float32
 
     @nn.compact
     def __call__(self, x, *, train=True):
@@ -45,8 +46,9 @@ class CasualAttention(nn.Module):
         casual_mask = nn.make_causal_mask(x=jnp.ones((batch, self.num_heads, seq_length))).squeeze()
         masked_dot_product = jnp.where(casual_mask, dot_product, -jnp.inf)
 
-        # todo: force masked_dot_product dtype to full precision when running on GPU
-        attn_scores = jax.nn.softmax(masked_dot_product)  # batch, num_head, seq_length, seq_length
+        # force masked_dot_product dtype to full precision when running on GPU
+        attn_scores = jax.nn.softmax(masked_dot_product.astype(self.reduce_ops_dtype))
+        attn_scores = attn_scores.astype(masked_dot_product.dtype)
         attn_scores = nn.Dropout(self.dropout_rate)(attn_scores, deterministic=not train)
 
         # batch, num_head, seq_length, embd_dim // num_heads
@@ -90,6 +92,7 @@ class MLP(nn.Module):
             embd_dim,
             use_bias=self.use_bias,
         )(x)
+
         if self.use_dropout:
             x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
 
@@ -99,19 +102,21 @@ class MLP(nn.Module):
 class AttentionBlock(nn.Module):
     use_bias: bool = True
     proj_kernel_init_norm: float = 1.0
+    reduce_ops_dtype: jnp.dtype = jnp.float32
 
     @nn.compact
     def __call__(self, x, train=True):
-        # todo: force input dtype to float32 when running on GPU
-        x_m = nn.LayerNorm(use_bias=self.use_bias, use_scale=True)(x)
+        x_m = nn.LayerNorm(use_bias=self.use_bias, use_scale=True)(x.astype(self.reduce_ops_dtype))
+        x_m = x_m.astype(x.dtype)
 
         x = CasualAttention(
             use_bias=self.use_bias,
-            proj_kernel_init_norm=self.proj_kernel_init_norm
+            proj_kernel_init_norm=self.proj_kernel_init_norm,
+            reduce_ops_dtype=self.reduce_ops_dtype
         )(x_m, train=train) + x
 
-        # todo: force input dtype to float32 when running on GPU
-        x_m = nn.LayerNorm(use_bias=self.use_bias, use_scale=True)(x)
+        x_m = nn.LayerNorm(use_bias=self.use_bias, use_scale=True)(x.astype(self.reduce_ops_dtype))
+        x_m = x_m.astype(x.dtype)
 
         x = MLP(
             use_bias=self.use_bias,
@@ -129,6 +134,7 @@ class GPTConfig:
     embd_dim: int = 768
     dropout_rate: float = 0.0
     use_bias: bool = True  # True: bias in Dense and LayerNorms, like GPT-2. False: a bit better and faster
+    reduce_ops_dtype: jnp.dtype = jnp.float32
 
 
 class GPT(nn.Module):
@@ -150,7 +156,8 @@ class GPT(nn.Module):
 
         self.blocks = [AttentionBlock(
             use_bias=self.config.use_bias,
-            proj_kernel_init_norm=jnp.sqrt(2 * self.config.num_layers)
+            proj_kernel_init_norm=jnp.sqrt(2 * self.config.num_layers),
+            reduce_ops_dtype=self.config.reduce_ops_dtype
         ) for _ in range(self.config.num_layers)]
 
         self.layer_norm = nn.LayerNorm(use_bias=self.config.use_bias, use_scale=True)
@@ -173,7 +180,8 @@ class GPT(nn.Module):
         if top_k:
             embeddings = embeddings[:, -top_k:, :]
 
-        embeddings = self.layer_norm(embeddings)
+        embeddings = self.layer_norm(embeddings.astype(self.config.reduce_ops_dtype))
+        embeddings = embeddings.astype(positions.dtype)
 
         logits = self.projection.apply(
             {"params": {

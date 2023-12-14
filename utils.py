@@ -1,16 +1,24 @@
-from typing import Callable
+from dataclasses import dataclass
 
 import jax
 from flax import struct
 from flax.training.train_state import TrainState as _TrainState
 import jmp
 import optax
+from jax import numpy as jnp
+from jmp._src.policy import _cast_floating_to
 
 
 @struct.dataclass
 class Batch:
     inputs: jax.Array
     labels: jax.Array
+
+
+@struct.dataclass
+class TrainMetrics:
+    loss: jax.Array
+    all_finite_grads: jax.Array
 
 
 class TrainState(_TrainState):
@@ -22,13 +30,14 @@ class TrainState(_TrainState):
         updates, new_opt_state = self.tx.update(grads, self.opt_state, self.params)
         new_params = optax.apply_updates(self.params, updates)
 
+        loss_scale = self.loss_scale
         if skip_infinite:
             # handle infinite grads:
             # 1 - check if there is no overflow in grads tree
             # 2 - adjust the loss scale based on that
             # 3 - for each weight, if the corresponding grad is inf, skip the update else return the new weight
             grads_finite = jmp.all_finite(grads)
-            self.loss_scale = self.loss_scale.adjust(grads_finite)
+            loss_scale = self.loss_scale.adjust(grads_finite)
             new_params, new_opt_state = jmp.select_tree(
                 grads_finite,
                 (new_params, new_opt_state),
@@ -39,6 +48,7 @@ class TrainState(_TrainState):
             step=self.step + 1,
             params=new_params,
             opt_state=new_opt_state,
+            loss_scale=loss_scale,
             **kwargs,
         )
 
@@ -56,3 +66,11 @@ class TrainState(_TrainState):
             opt_state=opt_state,
             **kwargs,
         )
+
+
+@dataclass(frozen=True)
+class Policy(jmp.Policy):
+    reduce_ops_dtype: jnp.dtype
+
+    def cast_to_reduce_ops(self, x):
+        return _cast_floating_to(x, self.reduce_ops_dtype)
