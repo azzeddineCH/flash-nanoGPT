@@ -5,7 +5,7 @@ import requests
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data_directory")
+parser.add_argument("--data_dir")
 args = parser.parse_args()
 
 data_dir = os.path.join(args.data_dir, "shakespeare")
