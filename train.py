@@ -14,6 +14,7 @@ config = Config(
     eval_num_steps=5,
     log_freq=1,
     batch_size=32,
+    grad_accum_steps=2,
     block_size=32,
     num_layers=8,
     num_heads=4,

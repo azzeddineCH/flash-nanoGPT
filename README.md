@@ -8,9 +8,9 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] Core data pipeline
 - [x] Core training loop
 - [x] Mixed precision training
-- [ ] Gradient accumulation
-- [ ] Batch pre-fetching
+- [x] Gradient accumulation
 - [ ] Data sharding across GPUs/TPUs
+- [ ] Batch pre-fetching
 - [ ] Reproducing results on shakespear dataset
 - [ ] Reproducing results on OpenWebText dataset if compute is available
 - [ ] Flash attention with Pallas

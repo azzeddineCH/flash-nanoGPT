@@ -9,7 +9,7 @@ import jax
 
 from utils import Batch, TrainState, Policy, TrainMetrics
 import jmp
-from jax import numpy as jnp
+from jax import numpy as jnp, tree_util as trx
 
 
 class Trainer:
@@ -66,7 +66,12 @@ class Trainer:
             b1=self.config.beta1,
             b2=self.config.beta2,
             weight_decay=self.config.weight_decay,
-            mask=jax.tree_util.tree_map(lambda p: p.ndim >= 2, params)
+            mask=trx.tree_map(lambda p: p.ndim >= 2, params)
+        )
+
+        optimizer = optax.MultiSteps(
+            optimizer,
+            every_k_schedule=self.config.grad_accum_steps
         )
 
         return optimizer
@@ -116,7 +121,7 @@ class Trainer:
         scaled_loss = self.policy.cast_to_compute(scaled_loss)
         return scaled_loss, loss
 
-    def _training_step(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch) -> Tuple[TrainState, TrainMetrics]:
+    def _update(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch) -> Tuple[TrainState, TrainMetrics]:
         params = self.policy.cast_to_compute(state.params)
         (_, loss), grads = jax.value_and_grad(self._loss, argnums=1, has_aux=True)(
             rng_key, params, state, batch
@@ -134,6 +139,29 @@ class Trainer:
             all_finite_grads=jmp.all_finite(grads)
         )
 
+        return state, metrics
+
+    def _training_step(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch) -> Tuple[TrainState, TrainMetrics]:
+        mini_batches = trx.tree_map(
+            lambda x: x.reshape(
+                self.config.grad_accum_steps,
+                -1,
+                self.config.block_size,
+            ), batch
+        )
+
+        rng_keys = jax.random.split(rng_key, self.config.grad_accum_steps)
+
+        state, metrics = jax.lax.scan(
+            f=lambda state, xs: self._update(
+                rng_key=xs[0],
+                state=state,
+                batch=xs[1]
+            ),
+            init=state,
+            xs=(rng_keys, mini_batches)
+        )
+        metrics = trx.tree_map(lambda m: jnp.mean(m), metrics)
         return state, metrics
 
     def _validation_step(self, rng_key: jax.Array, state: TrainState, batch: Batch):
