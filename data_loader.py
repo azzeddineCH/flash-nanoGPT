@@ -12,17 +12,17 @@ from utils import Batch
 class DataLoader:
     VOCAB_SIZE = 50304
 
-    def __init__(self, rng_key, dataset, batch_size, block_size, split="train"):
+    def __init__(self, rng_key, dataset_dir, batch_size, block_size, split="train"):
         self._current_batch = 0
         self.rng_key = rng_key
-        self.dataset = dataset
+        self.dataset_dir = dataset_dir
         self.batch_size = batch_size
         self.block_size = block_size
         self.split = split
-        self.data = self._load(self.dataset, self.split)
+        self.data = self._load(self.dataset_dir, self.split)
 
-    def _load(self, dataset, split):
-        file = os.path.join("data", dataset, f"{split}.bin")
+    def _load(self, dataset_dir, split):
+        file = os.path.join(dataset_dir, f"{split}.bin")
         data = np.memmap(file, dtype=np.uint16, mode='r')
         return jnp.array(data, dtype=jnp.int32)
 
@@ -52,7 +52,7 @@ class DataLoader:
 if __name__ == '__main__':
     loader = DataLoader(
         rng_key=jax.random.PRNGKey(0),
-        dataset="shakespeare",
+        dataset_dir="data/shakespeare",
         batch_size=256,
         block_size=1024,
     )

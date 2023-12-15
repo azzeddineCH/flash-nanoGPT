@@ -29,7 +29,7 @@ data_rng_key, training_key, key = jax.random.split(key, 3)
 
 train_data_loader = DataLoader(
     rng_key=data_rng_key,
-    dataset="shakespeare",
+    dataset_dir=config.dataset_dir,
     batch_size=config.batch_size,
     block_size=config.block_size,
     split="train"
@@ -37,7 +37,7 @@ train_data_loader = DataLoader(
 
 validation_data_loader = DataLoader(
     rng_key=data_rng_key,
-    dataset="shakespeare",
+    dataset_dir=config.dataset_dir,
     batch_size=config.batch_size,
     block_size=config.block_size,
     split="val"

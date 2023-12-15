@@ -12,7 +12,7 @@ class Config:
     wandb_project_name: str = "flash-nano-gpt"
     wandb_run_id: str = "flash-nanoGPT-1"
     # data
-    dataset: str = "shakespeare"
+    dataset_dir: str = "data/shakespeare"
     grad_accum_steps: int = 40
     batch_size: int = 12
     block_size: int = 1024
@@ -35,6 +35,6 @@ class Config:
     grad_clip: float = 1.0
     # training
     amp: bool = True
-    skip_infinite : bool = True
+    skip_infinite: bool = True
     device: str = "cpu"
     jit: bool = True
