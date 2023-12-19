@@ -14,7 +14,7 @@ config = Config(
     eval_num_steps=5,
     log_freq=1,
     batch_size=32,
-    grad_accum_steps=2,
+    grad_accum_steps=1,
     block_size=32,
     num_layers=8,
     num_heads=4,
@@ -23,7 +23,8 @@ config = Config(
     jit=True,
     wandb=False,
     amp=False,
-    skip_infinite=True
+    skip_infinite=True,
+    num_devices=2
 )
 
 data_rng_key, training_key, key = jax.random.split(key, 3)
@@ -90,14 +91,14 @@ for i in range(config.num_iters):
 
         train_loss /= config.eval_num_steps
         valid_loss /= config.eval_num_steps
-        print(f"Iter {train_state.step} | Training Batch loss {train_loss} | Validation loss {valid_loss}")
+        print(f"Iter {i+1} | Training Batch loss {train_loss} | Validation loss {valid_loss}")
 
         if config.wandb:
             wandb.log({"train/loss": train_loss, "valid/loss": valid_loss})
 
     if i % config.log_freq == 0:
         print(
-            f"Iter: {train_state.step} | "
+            f"Iter: {i+1} | "
             f"loss: {train_metrics.loss} | "
             f"grads finite: {train_metrics.all_finite_grads} | "
             f"loss scale: {train_state.loss_scale.loss_scale} | "

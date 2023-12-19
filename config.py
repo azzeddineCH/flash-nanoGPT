@@ -38,3 +38,4 @@ class Config:
     skip_infinite: bool = True
     device: str = "cpu"
     jit: bool = True
+    num_devices :int = 1

@@ -9,7 +9,7 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] Core training loop
 - [x] Mixed precision training
 - [x] Gradient accumulation
-- [ ] Data sharding across GPUs/TPUs
+- [x] Data sharding across GPUs/TPUs
 - [ ] Batch pre-fetching
 - [ ] Reproducing results on shakespear dataset
 - [ ] Reproducing results on OpenWebText dataset if compute is available

@@ -1,5 +1,5 @@
 from typing import Tuple
-
+from jax.experimental import mesh_utils
 import optax
 from jax.random import PRNGKeyArray
 
@@ -10,6 +10,7 @@ import jax
 from utils import Batch, TrainState, Policy, TrainMetrics
 import jmp
 from jax import numpy as jnp, tree_util as trx
+from jax import sharding as shx
 
 
 class Trainer:
@@ -17,16 +18,46 @@ class Trainer:
     def __init__(self, config: Config, vocab_size: int):
         self.config = config
         self.vocab_size = vocab_size
+
+        # ============= Mixed Precision Policy ============= #
         self.on_tpu = jax.local_devices()[0].platform == "tpu"
 
-        self.training_step = jax.jit(self._training_step) if config.jit else self._training_step
-        self.validation_step = jax.jit(self._validation_step) if config.jit else self._validation_step
         self.policy = Policy(
             param_dtype=jnp.float32,
             compute_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
             output_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
             reduce_ops_dtype=jmp.half_dtype() if (self.on_tpu and self.config.amp) else jnp.float32,
         )
+
+        # ============= Sharding Policy ============= #
+        self.host = jax.devices("cpu")[0]
+
+        self.device_mesh = self._make_device_mesh()
+
+        self.train_data_sharding = shx.NamedSharding(
+            self.device_mesh, spec=shx.PartitionSpec(None, "data")  # accumulation, batch, ...
+        )
+        self.valid_data_sharding = shx.NamedSharding(
+            self.device_mesh, spec=shx.PartitionSpec("data")  # batch, ...
+        )
+
+        self.state_sharding = shx.NamedSharding(
+            self.device_mesh, spec=shx.PartitionSpec()  # replicated
+        )
+
+        # ============= Jitting methods  ============= #
+        self.training_step = jax.jit(self._training_step) if config.jit else self._training_step
+        self.validation_step = jax.jit(self._validation_step) if config.jit else self._validation_step
+        self.make_train_state = jax.jit(self._make_train_state) if config.jit else self._make_train_state
+
+    def _make_device_mesh(self):
+        devices = jax.local_devices()
+        assert len(devices) >= self.config.num_devices, \
+            f"Not enough devices, requested {self.config.num_devices} found {len(devices)}"
+        devices = devices[:self.config.num_devices]
+        devices = mesh_utils.create_device_mesh((len(devices), 1), devices=devices)
+        mesh = shx.Mesh(devices, axis_names=("data", "state"))
+        return mesh
 
     def _make_model(self):
         config = GPTConfig(
@@ -51,7 +82,7 @@ class Trainer:
         model = GPT(config)
         state = model.init(key, x=random_input, train=False)
 
-        return model, state
+        return model, state["params"]
 
     def _make_optimizer(self, params):
         schedule = optax.warmup_cosine_decay_schedule(
@@ -76,9 +107,8 @@ class Trainer:
 
         return optimizer
 
-    def make_train_state(self):
-        model, model_state = self._make_model()
-        params = model_state["params"]
+    def _make_train_state(self):
+        model, params = self._make_model()
 
         optimizer = self._make_optimizer(params)
 
@@ -90,7 +120,7 @@ class Trainer:
             skip_infinite=self.config.skip_infinite
         )
 
-        print(f"Train state created | model parameters : {state.num_params}")
+        state = jax.device_put(state, self.state_sharding)
 
         return state
 
@@ -123,6 +153,7 @@ class Trainer:
 
     def _update(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch) -> Tuple[TrainState, TrainMetrics]:
         params = self.policy.cast_to_compute(state.params)
+
         (_, loss), grads = jax.value_and_grad(self._loss, argnums=1, has_aux=True)(
             rng_key, params, state, batch
         )
@@ -142,7 +173,7 @@ class Trainer:
         return state, metrics
 
     def _training_step(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch) -> Tuple[TrainState, TrainMetrics]:
-        mini_batches = trx.tree_map(
+        batch = trx.tree_map(
             lambda x: x.reshape(
                 self.config.grad_accum_steps,
                 -1,
@@ -150,21 +181,29 @@ class Trainer:
             ), batch
         )
 
+        batch = jax.device_put(batch, self.train_data_sharding)
         rng_keys = jax.random.split(rng_key, self.config.grad_accum_steps)
 
         state, metrics = jax.lax.scan(
             f=lambda state, xs: self._update(
                 rng_key=xs[0],
+                batch=xs[1],
                 state=state,
-                batch=xs[1]
             ),
             init=state,
-            xs=(rng_keys, mini_batches)
+            xs=(rng_keys, batch)
         )
+
         metrics = trx.tree_map(lambda m: jnp.mean(m), metrics)
+        metrics = jax.device_put(metrics, self.host)
+
         return state, metrics
 
     def _validation_step(self, rng_key: jax.Array, state: TrainState, batch: Batch):
         params = self.policy.cast_to_compute(state.params)
+        batch = jax.device_put(batch, self.valid_data_sharding)
+
         loss = self._loss(rng_key, params, state, batch, train=False)
+        loss = jax.device_put(loss, self.host)
+
         return loss
