@@ -6,11 +6,13 @@ from data_loader import DataLoader
 from trainer import Trainer
 import jax
 import wandb
+from utils import TrainMetrics
 
 key = jax.random.PRNGKey(0)
 
 config = Config(
     eval_freq=25,
+    save_checkpoint=True,
     eval_num_steps=5,
     log_freq=1,
     batch_size=32,
@@ -24,7 +26,8 @@ config = Config(
     wandb=False,
     amp=False,
     skip_infinite=True,
-    num_devices=2
+    num_devices=1,
+    restore="pre-trained"
 )
 
 data_rng_key, training_key, key = jax.random.split(key, 3)
@@ -50,10 +53,11 @@ trainer = Trainer(
     vocab_size=train_data_loader.VOCAB_SIZE
 )
 
-train_state = trainer.make_train_state()
-
-train_loss = None
-valid_loss = None
+start_iter = 0
+if config.restore == "scratch":
+    train_state = trainer.make_train_state()
+elif config.restore == "pre-trained":
+    train_state, start_iter = trainer.restore()
 
 if config.wandb:
     wandb.init(
@@ -62,7 +66,7 @@ if config.wandb:
         config=dataclasses.asdict(config)
     )
 
-for i in range(config.num_iters):
+for i in range(start_iter, config.num_iters):
 
     t0 = time.time()
     batch = next(train_data_loader)
@@ -71,42 +75,32 @@ for i in range(config.num_iters):
     step_time_s = time.time() - t0
 
     if i % config.eval_freq == 0:
-        train_loss = valid_loss = 0
-
+        valid_loss = 0
         for j in range(config.eval_num_steps):
-            train_batch = next(train_data_loader)
             valid_batch = next(validation_data_loader)
-
-            train_loss += trainer.validation_step(
-                step_rng_key,
-                train_state,
-                train_batch
-            )
-
             valid_loss += trainer.validation_step(
                 step_rng_key,
                 train_state,
                 valid_batch
-            )
+            ) / config.eval_num_steps
 
-        train_loss /= config.eval_num_steps
-        valid_loss /= config.eval_num_steps
-        print(f"Iter {i+1} | Training Batch loss {train_loss} | Validation loss {valid_loss}")
+        print(f"Iter {i + 1} |  Validation loss {valid_loss}")
+        if config.save_checkpoint:
+            trainer.save(i, train_state, metrics=TrainMetrics(loss=valid_loss))
 
         if config.wandb:
-            wandb.log({"train/loss": train_loss, "valid/loss": valid_loss})
+            wandb.log({"valid/loss": valid_loss})
 
     if i % config.log_freq == 0:
         print(
-            f"Iter: {i+1} | "
+            f"Iter: {i + 1} | "
             f"loss: {train_metrics.loss} | "
-            f"grads finite: {train_metrics.all_finite_grads} | "
             f"loss scale: {train_state.loss_scale.loss_scale} | "
             f"train time ms: {step_time_s * 1000} | "
         )
 
         if config.wandb:
-            wandb.log({"iter/loss": train_loss})
+            wandb.log({"iter/loss": train_metrics.loss})
 
 if config.wandb:
     wandb.finish()

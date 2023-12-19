@@ -7,6 +7,8 @@ class Config:
     eval_freq: int = 2000
     eval_num_steps: int = 10
     save_checkpoint: bool = False
+    restore: str = "scratch"  # scratch | pre-trained | gpt
+    checkpoint_dir: str = "checkpoints"
     log_freq: int = 1
     wandb: bool = True
     wandb_project_name: str = "flash-nano-gpt"
@@ -38,4 +40,4 @@ class Config:
     skip_infinite: bool = True
     device: str = "cpu"
     jit: bool = True
-    num_devices :int = 1
+    num_devices: int = 1

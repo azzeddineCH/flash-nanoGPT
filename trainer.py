@@ -11,6 +11,8 @@ from utils import Batch, TrainState, Policy, TrainMetrics
 import jmp
 from jax import numpy as jnp, tree_util as trx
 from jax import sharding as shx
+import os
+import orbax.checkpoint as ocp
 
 
 class Trainer:
@@ -49,6 +51,20 @@ class Trainer:
         self.training_step = jax.jit(self._training_step) if config.jit else self._training_step
         self.validation_step = jax.jit(self._validation_step) if config.jit else self._validation_step
         self.make_train_state = jax.jit(self._make_train_state) if config.jit else self._make_train_state
+
+        # ============= Checkpointing ============= #
+        os.makedirs(self.config.checkpoint_dir, exist_ok=True)
+        self.checkpointer = ocp.CheckpointManager(
+            self.config.checkpoint_dir,
+            checkpointers=dict(
+                state=ocp.PyTreeCheckpointer(),
+                train_metrics=ocp.PyTreeCheckpointer()
+            ),
+            options=ocp.CheckpointManagerOptions(
+                max_to_keep=3,
+                best_fn=lambda metrics: -metrics["loss"],
+            )
+        )
 
     def _make_device_mesh(self):
         devices = jax.local_devices()
@@ -120,6 +136,8 @@ class Trainer:
             skip_infinite=self.config.skip_infinite
         )
 
+        print(f"Train state created | model parameters : {state.num_params}")
+
         state = jax.device_put(state, self.state_sharding)
 
         return state
@@ -165,10 +183,7 @@ class Trainer:
 
         state = state.apply_gradients(grads=grads, skip_infinite=self.config.skip_infinite)
 
-        metrics = TrainMetrics(
-            loss=loss,
-            all_finite_grads=jmp.all_finite(grads)
-        )
+        metrics = TrainMetrics(loss=loss)
 
         return state, metrics
 
@@ -207,3 +222,28 @@ class Trainer:
         loss = jax.device_put(loss, self.host)
 
         return loss
+
+    def save(self, step: int, state: TrainState, metrics: TrainMetrics):
+        saved = self.checkpointer.save(
+            step,
+            items=dict(
+                state=state,
+                train_metrics=metrics
+            ),
+            metrics=dict(loss=float(metrics.loss))
+        )
+        if saved:
+            print(f"checkpoint saved ...{step}")
+
+    def restore(self, step=None):
+        if not step:
+            step = self.checkpointer.best_step()
+
+        ckpt = self.checkpointer.restore(
+            step,
+            items=dict(
+                state=self.make_train_state(),
+                train_metrics=TrainMetrics(loss=0)
+            )
+        )
+        return ckpt["state"], step

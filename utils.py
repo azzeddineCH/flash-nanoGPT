@@ -18,7 +18,6 @@ class Batch:
 @struct.dataclass
 class TrainMetrics:
     loss: jax.Array
-    all_finite_grads: jax.Array
 
 
 class TrainState(_TrainState):
