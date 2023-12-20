@@ -1,43 +1,43 @@
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class Config:
     # checkpoint and eval
-    eval_freq: int = 2000
-    eval_num_steps: int = 10
-    save_checkpoint: bool = False
-    restore: str = "scratch"  # scratch | pre-trained | gpt
-    checkpoint_dir: str = "checkpoints"
-    log_freq: int = 1
-    wandb: bool = True
-    wandb_project_name: str = "flash-nano-gpt"
-    wandb_run_id: str = "flash-nanoGPT-1"
+    eval_freq: int
+    eval_num_steps: int
+    save_checkpoint: int
+    restore: str  # scratch | pre-trained | gpt
+    checkpoint_dir: str
+    log_freq: int
+    wandb: bool
+    wandb_project_name: str
+    wandb_run_id: str
     # data
-    dataset_dir: str = "data/shakespeare"
-    grad_accum_steps: int = 40
-    batch_size: int = 12
-    block_size: int = 1024
+    dataset_dir: str
+    grad_accum_steps: int
+    batch_size: int
+    block_size: int
     # model
-    num_layers: int = 12
-    num_heads: int = 12
-    embd_dim: int = 768
-    dropout_rate: float = 0.2
-    use_bias: bool = False
+    num_layers: int
+    num_heads: int
+    embd_dim: int
+    dropout_rate: float
+    use_bias: bool
     # Optimizer
-    num_iters: int = int(6e5)
-    lr: float = 6e-4
-    lr_decay: bool = True
-    lr_warmup_iters: int = 2000
-    lr_decay_iters: int = int(6e5)
-    lr_min: float = 6e-5
-    weight_decay: float = 1e-1
-    beta1: float = 0.9
-    beta2: float = 0.95
-    grad_clip: float = 1.0
+    num_iters: int
+    lr: float
+    lr_decay: bool
+    lr_warmup_iters: int
+    lr_decay_iters: int
+    lr_min: float
+    weight_decay: float
+    beta1: float
+    beta2: float
+    grad_clip: float
     # training
-    amp: bool = True
-    skip_infinite: bool = True
-    device: str = "cpu"
-    jit: bool = True
-    num_devices: int = 1
+    amp: bool
+    skip_infinite: bool
+    device: str
+    jit: bool
+    num_devices: int

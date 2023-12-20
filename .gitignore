@@ -1,5 +1,5 @@
 **/*.bin
-**/*.txt
+data/**/*.txt
 wandb
 __pycache__/
 .ruff_cache

@@ -7,30 +7,24 @@ from trainer import Trainer
 import jax
 import wandb
 from utils import TrainMetrics
+import tyro
+import os
+
+# ============= Init configs ============= #
+
+config_path = os.environ.get("GPT_CONFIG_PATH", None)
+assert os.path.exists(config_path), f"Can't find env variable 'gpt-config-path', f{config_path}"
+
+with open(config_path, "r") as f:
+    default_config = tyro.from_yaml(Config, f)
+config = tyro.cli(Config, default=default_config)
+
+# ============= Init Random keys loaders ============= #
 
 key = jax.random.PRNGKey(0)
-
-config = Config(
-    eval_freq=25,
-    save_checkpoint=True,
-    eval_num_steps=5,
-    log_freq=1,
-    batch_size=32,
-    grad_accum_steps=1,
-    block_size=32,
-    num_layers=8,
-    num_heads=4,
-    embd_dim=128,
-    dropout_rate=0.0,
-    jit=True,
-    wandb=False,
-    amp=False,
-    skip_infinite=True,
-    num_devices=1,
-    restore="pre-trained"
-)
-
 data_rng_key, training_key, key = jax.random.split(key, 3)
+
+# ============= Init dataset loaders ============= #
 
 train_data_loader = DataLoader(
     rng_key=data_rng_key,
@@ -48,6 +42,8 @@ validation_data_loader = DataLoader(
     split="val"
 )
 
+# ============= Init training state ============= #
+
 trainer = Trainer(
     config=config,
     vocab_size=train_data_loader.VOCAB_SIZE
@@ -58,6 +54,10 @@ if config.restore == "scratch":
     train_state = trainer.make_train_state()
 elif config.restore == "pre-trained":
     train_state, start_iter = trainer.restore()
+else:
+    raise ValueError(f"Unknown restore method {config.restore}")
+
+# ============= Init Logging ============= #
 
 if config.wandb:
     wandb.init(
@@ -66,13 +66,19 @@ if config.wandb:
         config=dataclasses.asdict(config)
     )
 
+# ============= Training Loop ============= #
+
 for i in range(start_iter, config.num_iters):
+
+    # ============= Training ============= #
 
     t0 = time.time()
     batch = next(train_data_loader)
     step_rng_key = jax.jit(jax.random.fold_in)(training_key, i)
     train_state, train_metrics = trainer.training_step(step_rng_key, train_state, batch)
     step_time_s = time.time() - t0
+
+    # ============= Evaluation ============= #
 
     if i % config.eval_freq == 0:
         valid_loss = 0
@@ -90,6 +96,8 @@ for i in range(start_iter, config.num_iters):
 
         if config.wandb:
             wandb.log({"valid/loss": valid_loss})
+
+    # ============= Logging ============= #
 
     if i % config.log_freq == 0:
         print(
