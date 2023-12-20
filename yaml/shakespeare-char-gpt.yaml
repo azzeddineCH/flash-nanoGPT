@@ -1,0 +1,40 @@
+!dataclass:Config
+# checkpoint and eval
+eval_freq: 250
+eval_num_steps: 200
+save_checkpoint: false
+restore: "scratch"  # scratch | pre-trained | gpt
+checkpoint_dir: "checkpoints"
+log_freq: 10
+wandb: true
+wandb_project_name: "flash-nano-gpt"
+wandb_run_id: "shakespeare-char-gpt"
+# data
+dataset_dir: "data/shakespeare-char"
+vocab_size: 65
+grad_accum_steps: 1
+batch_size: 64
+block_size: 256
+# model
+num_layers: 6
+num_heads: 6
+embd_dim: 384
+dropout_rate: 0.2
+use_bias: false
+# Optimizer
+num_iters: 5000
+lr: 0.001
+lr_decay: true
+lr_warmup_iters: 100
+lr_decay_iters: 5000
+lr_min: 0.0001
+weight_decay: 0.1
+beta1: 0.9
+beta2: 0.99
+grad_clip: 1.0
+# training
+amp: true
+skip_infinite: true
+device: "tpu" # gpu | tpu | cpu
+jit: true
+num_devices: 1
