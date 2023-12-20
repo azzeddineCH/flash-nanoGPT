@@ -12,7 +12,6 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] Gradient accumulation
 - [x] Data sharding across GPUs/TPUs
 - [x] Loading and Saving checkpoints
-- [ ] Reproducing results on shakespear dataset
 - [ ] Multi-node support
 - [ ] Reproducing results on OpenWebText dataset if compute is available
 - [ ] Profiling/Benchmarking and speeding up iteration

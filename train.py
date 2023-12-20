@@ -102,13 +102,20 @@ for i in range(start_iter, config.num_iters):
     if i % config.log_freq == 0:
         print(
             f"Iter: {i + 1} | "
-            f"loss: {train_metrics.loss} | "
+            f"loss: {train_metrics.loss} | ",
+            f"lr: {train_state.lr} | ",
             f"loss scale: {train_state.loss_scale.loss_scale} | "
             f"train time ms: {step_time_s * 1000} | "
         )
 
         if config.wandb:
-            wandb.log({"iter/loss": train_metrics.loss})
+            wandb.log({
+                "iter": i + 1,
+                "iter/loss": train_metrics.loss,
+                "iter/lr": train_state.lr,
+                "iter/loss_scale": train_state.loss_scale.loss_scale,
+                "iter/train_time_ms": step_time_s * 1000
+            })
 
 if config.wandb:
     wandb.finish()

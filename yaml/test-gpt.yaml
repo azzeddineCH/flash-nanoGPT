@@ -26,7 +26,7 @@ lr: 0.0006
 lr_decay: true
 lr_warmup_iters: 200
 lr_decay_iters: 1000
-lr_min: 0.0006
+lr_min: 0.00006
 weight_decay: 0.1
 beta1: 0.9
 beta2: 0.95

@@ -51,6 +51,10 @@ class TrainState(_TrainState):
             **kwargs,
         )
 
+    @property
+    def lr(self):
+        return self.opt_state.inner_opt_state[1].hyperparams["learning_rate"]
+
     @classmethod
     def create(cls, *, apply_fn, params, tx, **kwargs):
         """Creates a new instance with `step=0` and initialized `opt_state`."""

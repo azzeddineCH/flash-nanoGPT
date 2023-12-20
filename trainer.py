@@ -101,15 +101,17 @@ class Trainer:
         return model, state["params"]
 
     def _make_optimizer(self, params):
+
         schedule = optax.warmup_cosine_decay_schedule(
-            init_value=self.config.lr_min,
+            init_value=0.0,
             peak_value=self.config.lr,
             warmup_steps=self.config.lr_warmup_iters,
             decay_steps=self.config.lr_decay_iters,
             end_value=self.config.lr_min
         )
 
-        optimizer = optax.adamw(
+        # we use "optax.inject_hyperparams" in order to track the learning rate
+        optimizer = optax.inject_hyperparams(optax.adamw)(
             learning_rate=schedule,
             b1=self.config.beta1,
             b2=self.config.beta2,
@@ -118,8 +120,8 @@ class Trainer:
         )
 
         optimizer = optax.chain(
+            optax.clip(self.config.grad_clip),
             optimizer,
-            optax.clip(self.config.grad_clip)
         )
 
         optimizer = optax.MultiSteps(
