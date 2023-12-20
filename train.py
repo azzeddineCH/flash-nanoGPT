@@ -44,10 +44,7 @@ validation_data_loader = DataLoader(
 
 # ============= Init training state ============= #
 
-trainer = Trainer(
-    config=config,
-    vocab_size=train_data_loader.VOCAB_SIZE
-)
+trainer = Trainer(config=config)
 
 start_iter = 0
 if config.restore == "scratch":

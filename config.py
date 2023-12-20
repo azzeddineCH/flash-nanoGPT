@@ -15,7 +15,7 @@ class Config:
     wandb_run_id: str
     # data
     dataset_dir: str
-    grad_accum_steps: int
+    vocab_size: int
     batch_size: int
     block_size: int
     # model
@@ -36,6 +36,7 @@ class Config:
     beta2: float
     grad_clip: float
     # training
+    grad_accum_steps: int
     amp: bool
     skip_infinite: bool
     device: str

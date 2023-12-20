@@ -10,7 +10,6 @@ from utils import Batch
 
 
 class DataLoader:
-    VOCAB_SIZE = 50304
 
     def __init__(self, rng_key, dataset_dir, batch_size, block_size, split="train"):
         self._current_batch = 0

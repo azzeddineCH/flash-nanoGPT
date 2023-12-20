@@ -11,7 +11,7 @@ wandb_project_name: "flash-nano-gpt"
 wandb_run_id: "flash-nanoGPT-1"
 # data
 dataset_dir: "data/shakespeare"
-grad_accum_steps: 40
+vocab_size: 50304
 batch_size: 12
 block_size: 1024
 # model
@@ -32,6 +32,7 @@ beta1: 0.9
 beta2: 0.95
 grad_clip: 1.0
 # training
+grad_accum_steps: 40
 amp: true
 skip_infinite: true
 device: "tpu" # gpu | tpu | cpu

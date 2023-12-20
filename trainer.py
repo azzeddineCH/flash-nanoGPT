@@ -17,9 +17,8 @@ import orbax.checkpoint as ocp
 
 class Trainer:
 
-    def __init__(self, config: Config, vocab_size: int):
+    def __init__(self, config: Config):
         self.config = config
-        self.vocab_size = vocab_size
 
         # ============= Mixed Precision Policy ============= #
         self.on_tpu = jax.local_devices()[0].platform == "tpu"
@@ -78,7 +77,7 @@ class Trainer:
     def _make_model(self):
         config = GPTConfig(
             block_size=self.config.block_size,
-            vocab_size=self.vocab_size,
+            vocab_size=self.config.vocab_size,
             num_layers=self.config.num_layers,
             num_heads=self.config.num_heads,
             embd_dim=self.config.embd_dim,
@@ -165,8 +164,8 @@ class Trainer:
         logits = self.policy.cast_to_reduce_ops(logits)
 
         loss = optax.softmax_cross_entropy(
-            logits=logits.reshape((-1, self.vocab_size)),
-            labels=jax.nn.one_hot(batch.labels.reshape(-1), num_classes=self.vocab_size, dtype=logits.dtype)
+            logits=logits.reshape((-1, self.config.vocab_size)),
+            labels=jax.nn.one_hot(batch.labels.reshape(-1), num_classes=self.config.vocab_size, dtype=logits.dtype)
         ).mean()
 
         if not train:
