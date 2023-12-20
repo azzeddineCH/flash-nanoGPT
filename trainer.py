@@ -108,12 +108,18 @@ class Trainer:
             decay_steps=self.config.lr_decay_iters,
             end_value=self.config.lr_min
         )
+
         optimizer = optax.adamw(
             learning_rate=schedule,
             b1=self.config.beta1,
             b2=self.config.beta2,
             weight_decay=self.config.weight_decay,
             mask=trx.tree_map(lambda p: p.ndim >= 2, params)
+        )
+
+        optimizer = optax.chain(
+            optimizer,
+            optax.clip(self.config.grad_clip)
         )
 
         optimizer = optax.MultiSteps(
