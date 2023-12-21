@@ -119,7 +119,7 @@ class Trainer:
         )
 
         optimizer = optax.chain(
-            optax.clip(self.config.grad_clip),
+            optax.clip_by_global_norm(self.config.grad_clip),
             optimizer,
         )
 
