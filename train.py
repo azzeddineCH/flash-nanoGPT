@@ -104,6 +104,7 @@ for i in range(start_iter, config.num_iters):
                 "val/loss": valid_loss,
                 "lr": train_state.lr,
                 "loss_scale": train_state.loss_scale.loss_scale,
+                "grads_gnorm": train_metrics.grads_gnorm,
                 "time_ms": step_time_s * 1000
             })
 

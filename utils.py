@@ -18,6 +18,7 @@ class Batch:
 @struct.dataclass
 class TrainMetrics:
     loss: jax.Array
+    grads_gnorm: jax.Array = None
 
 
 class TrainState(_TrainState):

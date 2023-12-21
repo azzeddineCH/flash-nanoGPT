@@ -190,7 +190,7 @@ class Trainer:
 
         state = state.apply_gradients(grads=grads, skip_infinite=self.config.skip_infinite)
 
-        metrics = TrainMetrics(loss=loss)
+        metrics = TrainMetrics(loss=loss, grads_gnorm=optax.global_norm(grads))
 
         return state, metrics
 
