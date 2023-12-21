@@ -19,6 +19,7 @@ class Batch:
 class TrainMetrics:
     loss: jax.Array
     grads_gnorm: jax.Array = None
+    params_gnorm: jax.Array = None
 
 
 class TrainState(_TrainState):
