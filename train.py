@@ -79,20 +79,38 @@ for i in range(start_iter, config.num_iters):
 
     if i % config.eval_freq == 0:
         valid_loss = 0
+        train_loss = 0
         for j in range(config.eval_num_steps):
+
             valid_batch = next(validation_data_loader)
+            train_batch = next(train_data_loader)
+
             valid_loss += trainer.validation_step(
                 step_rng_key,
                 train_state,
                 valid_batch
             ) / config.eval_num_steps
 
-        print(f"Iter {i + 1} |  Validation loss {valid_loss}")
-        if config.save_checkpoint:
-            trainer.save(i, train_state, metrics=TrainMetrics(loss=valid_loss))
+            train_loss += trainer.validation_step(
+                step_rng_key,
+                train_state,
+                train_batch
+            ) / config.eval_num_steps
+
+        print(f"Iter {i + 1} |  Val loss {valid_loss} | Train loss {train_loss}")
 
         if config.wandb:
-            wandb.log({"valid_loss": valid_loss})
+            wandb.log({
+                "iter": i + 1,
+                "train/loss": train_loss,
+                "val/loss": valid_loss,
+                "lr": train_state.lr,
+                "loss_scale": train_state.loss_scale.loss_scale,
+                "time_ms": step_time_s * 1000
+            })
+
+        if config.save_checkpoint:
+            trainer.save(i, train_state, metrics=TrainMetrics(loss=valid_loss))
 
     # ============= Logging ============= #
 
@@ -100,19 +118,8 @@ for i in range(start_iter, config.num_iters):
         print(
             f"Iter: {i + 1} | "
             f"loss: {train_metrics.loss} | ",
-            f"lr: {train_state.lr} | ",
-            f"loss scale: {train_state.loss_scale.loss_scale} | "
-            f"train time ms: {step_time_s * 1000} | "
+            f"time_ms: {step_time_s * 1000} | "
         )
-
-        if config.wandb:
-            wandb.log({
-                "iter": i + 1,
-                "train_loss": train_metrics.loss,
-                "lr": train_state.lr,
-                "loss_scale": train_state.loss_scale.loss_scale,
-                "train_time_ms": step_time_s * 1000
-            })
 
 if config.wandb:
     wandb.finish()
