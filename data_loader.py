@@ -29,10 +29,10 @@ class DataLoader:
         self._current_batch = 0
         return self
 
-    @partial(jax.jit, static_argnums=(0,))
     def __next__(self) -> Batch:
         self._current_batch += 1
 
+        @jax.jit
         def _sample_batch(i):
             key = jax.random.fold_in(self.rng_key, data=i)
             idx = jax.random.randint(key, shape=(self.batch_size,), minval=0, maxval=len(self.data) - self.block_size)
