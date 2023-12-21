@@ -92,7 +92,7 @@ for i in range(start_iter, config.num_iters):
             trainer.save(i, train_state, metrics=TrainMetrics(loss=valid_loss))
 
         if config.wandb:
-            wandb.log({"valid/loss": valid_loss})
+            wandb.log({"valid_loss": valid_loss})
 
     # ============= Logging ============= #
 
@@ -108,10 +108,10 @@ for i in range(start_iter, config.num_iters):
         if config.wandb:
             wandb.log({
                 "iter": i + 1,
-                "iter/loss": train_metrics.loss,
-                "iter/lr": train_state.lr,
-                "iter/loss_scale": train_state.loss_scale.loss_scale,
-                "iter/train_time_ms": step_time_s * 1000
+                "train_loss": train_metrics.loss,
+                "lr": train_state.lr,
+                "loss_scale": train_state.loss_scale.loss_scale,
+                "train_time_ms": step_time_s * 1000
             })
 
 if config.wandb:
