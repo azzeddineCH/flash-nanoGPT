@@ -27,7 +27,6 @@ data_rng_key, training_key, key = jax.random.split(key, 3)
 # ============= Init dataset loaders ============= #
 
 train_data_loader = DataLoader(
-    rng_key=data_rng_key,
     dataset_dir=config.dataset_dir,
     batch_size=config.batch_size,
     block_size=config.block_size,
@@ -35,7 +34,6 @@ train_data_loader = DataLoader(
 )
 
 validation_data_loader = DataLoader(
-    rng_key=data_rng_key,
     dataset_dir=config.dataset_dir,
     batch_size=config.batch_size,
     block_size=config.block_size,
@@ -70,9 +68,9 @@ for i in range(start_iter, config.num_iters):
     # ============= Training ============= #
 
     t0 = time.time()
-    batch = next(train_data_loader)
-    step_rng_key = jax.jit(jax.random.fold_in)(training_key, i)
-    train_state, train_metrics = trainer.training_step(step_rng_key, train_state, batch)
+    train_batch_key, train_step_key, training_key = jax.random.split(training_key, 3)
+    batch = train_data_loader.get(train_batch_key)
+    train_state, train_metrics = trainer.training_step(train_step_key, train_state, batch)
     step_time_s = time.time() - t0
 
     # ============= Evaluation ============= #
@@ -80,19 +78,19 @@ for i in range(start_iter, config.num_iters):
     if i % config.eval_freq == 0:
         valid_loss = 0
         train_loss = 0
+        train_eval_key, valid_eval_key, training_key = jax.random.split(training_key, 3)
         for j in range(config.eval_num_steps):
-
-            valid_batch = next(validation_data_loader)
-            train_batch = next(train_data_loader)
+            valid_batch = validation_data_loader.get(jax.random.fold_in(valid_eval_key, j))
+            train_batch = train_data_loader.get(jax.random.fold_in(train_eval_key, j))
 
             valid_loss += trainer.validation_step(
-                step_rng_key,
+                train_step_key,
                 train_state,
                 valid_batch
             ) / config.eval_num_steps
 
             train_loss += trainer.validation_step(
-                step_rng_key,
+                train_step_key,
                 train_state,
                 train_batch
             ) / config.eval_num_steps
