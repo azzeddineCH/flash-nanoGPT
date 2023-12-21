@@ -89,7 +89,7 @@ class Trainer:
         key = jax.random.PRNGKey(0)
         random_input = jax.random.randint(
             key,
-            shape=(1, 8),
+            shape=(2, 8),
             minval=0,
             maxval=config.vocab_size,
             dtype=jnp.int16 if self.config.amp else jnp.int32
@@ -161,11 +161,10 @@ class Trainer:
         """
 
         logits = state.apply_fn({"params": params}, x=batch.inputs, train=train, rngs={"dropout": rng_key})
-        logits = self.policy.cast_to_reduce_ops(logits)
 
-        loss = optax.softmax_cross_entropy(
-            logits=logits.reshape((-1, self.config.vocab_size)),
-            labels=jax.nn.one_hot(batch.labels.reshape(-1), num_classes=self.config.vocab_size, dtype=logits.dtype)
+        loss = optax.softmax_cross_entropy_with_integer_labels(
+            logits=self.policy.cast_to_reduce_ops(logits),
+            labels=batch.labels
         ).mean()
 
         if not train:

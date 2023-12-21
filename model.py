@@ -45,7 +45,7 @@ class CasualAttention(nn.Module):
 
         # batch, num_head, seq_length, seq_length
         casual_mask = nn.make_causal_mask(x=jnp.ones((batch, self.num_heads, seq_length))).squeeze()
-        masked_dot_product = jnp.where(casual_mask, dot_product, -jnp.inf)
+        masked_dot_product = jnp.where(casual_mask, dot_product, jnp.finfo(dot_product.dtype).min)
 
         # force masked_dot_product dtype to full precision when running on GPU
         attn_scores = jax.nn.softmax(masked_dot_product.astype(self.reduce_ops_dtype))
