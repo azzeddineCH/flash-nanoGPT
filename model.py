@@ -17,7 +17,7 @@ def make_dense(kernel_init_mean: float = 0, kernel_init_std: float = 1):
     return partial(nn.Dense, kernel_init=normal_initializer(mean=kernel_init_mean, std=kernel_init_std))
 
 
-HiddenDense = make_dense(kernel_init_std=0.2)
+HiddenDense = make_dense(kernel_init_std=0.02)
 LayerNorm = partial(nn.LayerNorm, epsilon=1e-5)
 
 
