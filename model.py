@@ -18,6 +18,7 @@ def make_dense(kernel_init_mean: float = 0, kernel_init_std: float = 1):
 
 
 HiddenDense = make_dense(kernel_init_std=0.2)
+LayerNorm = partial(nn.LayerNorm, epsilon=1e-5)
 
 
 class CasualAttention(nn.Module):
@@ -73,7 +74,6 @@ class CasualAttention(nn.Module):
 
 class MLP(nn.Module):
     input_factor: int = 4
-    use_dropout: bool = True
     dropout_rate: float = 0.2
     use_bias: bool = True
     proj_kernel_init_norm: int = 1
@@ -93,8 +93,7 @@ class MLP(nn.Module):
             use_bias=self.use_bias,
         )(x)
 
-        if self.use_dropout:
-            x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
+        x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
 
         return x
 
@@ -106,7 +105,7 @@ class AttentionBlock(nn.Module):
 
     @nn.compact
     def __call__(self, x, train=True):
-        x_m = nn.LayerNorm(use_bias=self.use_bias, use_scale=True)(x.astype(self.reduce_ops_dtype))
+        x_m = LayerNorm(use_bias=self.use_bias, use_scale=True)(x.astype(self.reduce_ops_dtype))
         x_m = x_m.astype(x.dtype)
 
         x = CasualAttention(
@@ -115,7 +114,7 @@ class AttentionBlock(nn.Module):
             reduce_ops_dtype=self.reduce_ops_dtype
         )(x_m, train=train) + x
 
-        x_m = nn.LayerNorm(use_bias=self.use_bias, use_scale=True)(x.astype(self.reduce_ops_dtype))
+        x_m = LayerNorm(use_bias=self.use_bias, use_scale=True)(x.astype(self.reduce_ops_dtype))
         x_m = x_m.astype(x.dtype)
 
         x = MLP(
@@ -160,12 +159,7 @@ class GPT(nn.Module):
             reduce_ops_dtype=self.config.reduce_ops_dtype
         ) for _ in range(self.config.num_layers)]
 
-        self.layer_norm = nn.LayerNorm(use_bias=self.config.use_bias, use_scale=True)
-
-        # the projection layer shares the same weights as the token embeddings, as a result it would be defined
-        # as a top level module (https://flax.readthedocs.io/en/latest/developer_notes/module_lifecycle.html#top-level-modules)
-        # at call time, the embeddings params are passed to the layer apply method
-        self.projection = nn.Dense(self.config.vocab_size, use_bias=self.config.use_bias, parent=None)
+        self.layer_norm = LayerNorm(use_bias=self.config.use_bias, use_scale=True)
 
     def __call__(self, x, *, train=True, top_k=None):
         batch, seq_length = x.shape
@@ -183,11 +177,7 @@ class GPT(nn.Module):
         embeddings = self.layer_norm(embeddings.astype(self.config.reduce_ops_dtype))
         embeddings = embeddings.astype(positions.dtype)
 
-        logits = self.projection.apply(
-            {"params": {
-                "kernel": self.token_embeddings.variables["params"]["embedding"].T}
-            }, embeddings
-        )
+        logits = self.token_embeddings.attend(embeddings)
 
         return logits
 
