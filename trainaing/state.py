@@ -1,25 +1,7 @@
-from dataclasses import dataclass
-
 import jax
-from flax import struct
 from flax.training.train_state import TrainState as _TrainState
 import jmp
 import optax
-from jax import numpy as jnp
-from jmp._src.policy import _cast_floating_to
-
-
-@struct.dataclass
-class Batch:
-    inputs: jax.Array
-    labels: jax.Array
-
-
-@struct.dataclass
-class TrainMetrics:
-    loss: jax.Array
-    grads_gnorm: jax.Array = None
-    params_gnorm: jax.Array = None
 
 
 class TrainState(_TrainState):
@@ -71,11 +53,3 @@ class TrainState(_TrainState):
             opt_state=opt_state,
             **kwargs,
         )
-
-
-@dataclass(frozen=True)
-class Policy(jmp.Policy):
-    reduce_ops_dtype: jnp.dtype
-
-    def cast_to_reduce_ops(self, x):
-        return _cast_floating_to(x, self.reduce_ops_dtype)

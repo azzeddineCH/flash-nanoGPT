@@ -4,10 +4,12 @@ import optax
 from jax.random import PRNGKeyArray
 
 from config import Config
-from model import GPTConfig, GPT
+from trainaing.model import GPTConfig, GPT
 import jax
 
-from utils import Batch, TrainState, Policy, TrainMetrics
+from trainaing.utils import Policy, TrainMetrics
+from ds.utils import Batch
+from trainaing.state import TrainState
 import jmp
 from jax import numpy as jnp, tree_util as trx
 from jax import sharding as shx

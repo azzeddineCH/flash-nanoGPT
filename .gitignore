@@ -1,5 +1,4 @@
-**/*.bin
-data/**/*.txt
+data/**/*.tfrecord
 wandb
 __pycache__/
 .ruff_cache

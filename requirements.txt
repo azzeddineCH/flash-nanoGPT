@@ -1,3 +1,14 @@
 tyro
 orbax-checkpoint
 tiktoken
+jax==0.4.23
+jaxlib==0.4.23
+tensorflow-macos==2.15.0
+flax==0.7.5
+optax==0.1.7
+git+https://github.com/deepmind/jmp
+tyro==0.6.1
+wandb==0.16.1
+tiktoken
+datasets
+google-cloud-storage
