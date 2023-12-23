@@ -51,12 +51,12 @@ class DataLoader:
             num_parallel_calls=self.num_workers
         ).repeat(
             # repeat the dataset inf
-        ).shuffle(
-            self.buffer_size
         ).unbatch().batch(
             # un-batch the blocks to form a single sequence then
             # batch it by block_size + 1 ( add one to consider the last prediction)
             self.block_size + 1, drop_remainder=True
+        ).shuffle(
+            self.buffer_size
         ).batch(
             # batch the dataset to get the shape of (batch_size, block_size)
             self.batch_size
