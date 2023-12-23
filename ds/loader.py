@@ -60,6 +60,8 @@ class DataLoader:
         ).batch(
             # batch the dataset to get the shape of (batch_size, block_size)
             self.batch_size
+        ).shuffle(
+            self.buffer_size
         ).prefetch(
             # prefetch the next N batches while training running on the accelerator
             self.prefetch
