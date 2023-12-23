@@ -19,7 +19,7 @@ class DataLoader:
             num_shards: int = 1,
             shard: int = 0,
             num_workers: int = tf.data.AUTOTUNE,
-            buffer_size: int = 256,
+            buffer_size: int = 5,
             prefetch: int = 2
     ):
         self.directory = directory
@@ -57,9 +57,6 @@ class DataLoader:
             # un-batch the blocks to form a single sequence then
             # batch it by block_size + 1 ( add one to consider the last prediction)
             self.block_size + 1, drop_remainder=True
-        ).shuffle(
-            # shuffle the blocks again
-            self.buffer_size
         ).batch(
             # batch the dataset to get the shape of (batch_size, block_size)
             self.batch_size

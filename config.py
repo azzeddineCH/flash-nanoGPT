@@ -18,6 +18,8 @@ class Config:
     vocab_size: int
     batch_size: int
     block_size: int
+    buffer_size: int
+    prefetch: int
     # model
     num_layers: int
     num_heads: int

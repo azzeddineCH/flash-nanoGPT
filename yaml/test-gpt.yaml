@@ -14,6 +14,8 @@ dataset_dir: "data/shakespeare"
 vocab_size: 50304
 batch_size: 32
 block_size: 32
+buffer_size: 5
+prefetch: 2
 # model
 num_layers: 8
 num_heads: 4

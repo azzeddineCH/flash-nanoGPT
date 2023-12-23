@@ -40,7 +40,8 @@ train_data_iter = DataLoader(
     batch_size=config.batch_size,
     block_size=config.block_size,
     split="train",
-    prefetch=5,
+    prefetch=config.prefetch,
+    buffer_size=config.buffer_size,
     num_workers=4
 ).get_iterator()
 
@@ -49,7 +50,8 @@ validation_data_iter = DataLoader(
     batch_size=config.batch_size,
     block_size=config.block_size,
     split="val",
-    prefetch=5,
+    prefetch=config.prefetch,
+    buffer_size=config.buffer_size,
     num_workers=4
 ).get_iterator()
 
