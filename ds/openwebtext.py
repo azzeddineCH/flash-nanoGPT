@@ -3,7 +3,7 @@ import multiprocessing
 import shutil
 
 import tiktoken
-import datasets as ds
+import datasets
 import os
 import jax.numpy as jnp
 import tensorflow as tf
@@ -28,7 +28,7 @@ def main():
     shards = dict(train=args.num_train_shards, val=args.num_valid_shards)
 
     # ds = ds.load_dataset("openwebtext", num_proc=num_workers)
-    dataset = ds.load_dataset("openwebtext", num_proc=num_workers)
+    dataset = datasets.load_dataset("openwebtext", num_proc=num_workers)
     split_dataset = dataset["trainaing"].train_test_split(test_size=0.5, seed=2357, shuffle=True)
     split_dataset['val'] = split_dataset.pop('test')
 
