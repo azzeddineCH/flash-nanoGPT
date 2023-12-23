@@ -70,8 +70,9 @@ class DataLoader:
     def get_iterator(self):
         @jax.jit
         def make_batch(item):
-            x, y = item[:, 1:], item[:, :-1]
+            x, y = item[:, :-1], item[:, 1:]
             return Batch(inputs=x, labels=y)
+            return item
 
         def jax_iterator():
             for item in self.dataset:
@@ -84,7 +85,7 @@ if __name__ == '__main__':
     rng_key = jax.random.PRNGKey(0)
     iterator = DataLoader(
         directory="../data/shakespeare",
-        split="trainaing",
+        split="train",
         batch_size=256,
         block_size=1024,
         num_shards=1,
@@ -93,7 +94,7 @@ if __name__ == '__main__':
 
     for i in range(10):
         t0 = time.time()
-        print(next(iterator))
+        x = next(iterator)
         t1 = time.time() - t0
 
         print(f"iter {i} | sampling time {t1}")
