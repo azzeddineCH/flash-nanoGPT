@@ -105,7 +105,7 @@ for i in range(start_iter, config.num_iters):
         if config.wandb:
             wandb.log({
                 "iter": i + 1,
-                "trainaing/loss": train_loss,
+                "train/loss": train_loss,
                 "val/loss": valid_loss,
                 "lr": train_state.lr,
                 "loss_scale": train_state.loss_scale.loss_scale,
