@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Iterator
 
 import tensorflow as tf
 import jax
@@ -35,7 +35,7 @@ class DataLoader:
 
         self.dataset: Optional[tf.data.Dataset] = self._load()
 
-    def _load(self):
+    def _load(self) -> tf.data.Dataset:
         file_ds = tf.data.Dataset.list_files(f"{self.directory}/{self.split}*.tfrecord").shard(
             num_shards=self.num_shards,
             index=self.shard
@@ -69,7 +69,7 @@ class DataLoader:
 
         return dataset
 
-    def get_iterator(self):
+    def get_iterator(self) -> Iterator:
         @jax.jit
         def make_batch(item):
             x, y = item[:, :-1], item[:, 1:]

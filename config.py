@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-
+import os
+import tyro
 
 @dataclass(frozen=True)
 class Config:
@@ -44,3 +45,11 @@ class Config:
     device: str
     jit: bool
     num_devices: int
+
+
+def get_default_config():
+    config_path = os.environ.get("GPT_CONFIG_PATH", "yaml/test-gpt.yaml")
+    assert os.path.exists(config_path), f"Can't find env variable 'gpt-config-path', f{config_path}"
+
+    with open(config_path, "r") as f:
+        default_config = tyro.from_yaml(Config, f)

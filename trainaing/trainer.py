@@ -1,9 +1,12 @@
+from dataclasses import asdict
 from typing import Tuple
+
+from flax.struct import PyTreeNode
 from jax.experimental import mesh_utils
 import optax
 from jax.random import PRNGKeyArray
 
-from config import Config
+from config import Config, get_default_config
 from model import GPTConfig, GPT
 import jax
 
@@ -67,7 +70,7 @@ class Trainer:
             )
         )
 
-    def _make_device_mesh(self):
+    def _make_device_mesh(self) -> shx.Mesh:
         devices = jax.local_devices()
         assert len(devices) >= self.config.num_devices, \
             f"Not enough devices, requested {self.config.num_devices} found {len(devices)}"
@@ -76,7 +79,7 @@ class Trainer:
         mesh = shx.Mesh(devices, axis_names=("data", "state"))
         return mesh
 
-    def _make_model(self):
+    def _make_model(self) -> Tuple[GPT, PyTreeNode]:
         config = GPTConfig(
             block_size=self.config.block_size,
             vocab_size=self.config.vocab_size,
@@ -101,7 +104,7 @@ class Trainer:
 
         return model, state["params"]
 
-    def _make_optimizer(self, params):
+    def _make_optimizer(self, params: PyTreeNode) -> optax.MultiSteps:
 
         schedule = optax.warmup_cosine_decay_schedule(
             init_value=0.0,
@@ -132,7 +135,7 @@ class Trainer:
 
         return optimizer
 
-    def _make_train_state(self):
+    def _make_train_state(self) -> TrainState:
         model, params = self._make_model()
 
         optimizer = self._make_optimizer(params)
@@ -151,7 +154,8 @@ class Trainer:
 
         return state
 
-    def _loss(self, rng_key: PRNGKeyArray, params, state: TrainState, batch: Batch, train: bool = True):
+    def _loss(self, rng_key: PRNGKeyArray, params: PyTreeNode, state: TrainState, batch: Batch,
+              train: bool = True) -> Tuple[float, float]:
         """
         calculate the batch loss following these steps:
 
@@ -226,7 +230,7 @@ class Trainer:
 
         return state, metrics
 
-    def _validation_step(self, rng_key: jax.Array, state: TrainState, batch: Batch):
+    def _validation_step(self, rng_key: jax.Array, state: TrainState, batch: Batch) -> float:
         params = self.policy.cast_to_compute(state.params)
         batch = jax.device_put(batch, self.valid_data_sharding)
 
@@ -240,14 +244,15 @@ class Trainer:
             step,
             items=dict(
                 state=state,
-                train_metrics=metrics
+                train_metrics=metrics,
+                config=asdict(self.config),
             ),
             metrics=dict(loss=float(metrics.loss))
         )
         if saved:
             print(f"checkpoint saved ...{step}")
 
-    def restore(self, step=None):
+    def restore(self, step=None) -> Tuple[TrainState, int]:
         if not step:
             step = self.checkpointer.best_step()
 
@@ -255,7 +260,8 @@ class Trainer:
             step,
             items=dict(
                 state=self.make_train_state(),
-                train_metrics=TrainMetrics(loss=0)
+                train_metrics=TrainMetrics(loss=0),
+                config=get_default_config(),
             )
         )
         return ckpt["state"], step

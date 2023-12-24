@@ -16,6 +16,7 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] TF Record reader/write with support for GCP bucket
 - [ ] Multi-host training
 - [ ] Reproducing results on OpenWebText dataset
+- [ ] Loading GPTs pre-trained models
 - [ ] Profiling/Benchmarking and speeding up iteration
 - [ ] Loading GPT-2 weights
 - [ ] Fine tuning GPT-2 weights

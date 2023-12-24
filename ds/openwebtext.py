@@ -4,9 +4,8 @@ import shutil
 import tiktoken
 import datasets
 import os
-import jax.numpy as jnp
 import tensorflow as tf
-
+import numpy as np
 from utils import upload_directory_with_transfer_manager, make_tf_record_example
 import multiprocessing
 
@@ -28,7 +27,7 @@ def main():
     shards = dict(train=args.num_train_shards, val=args.num_valid_shards)
 
     dataset = datasets.load_dataset("openwebtext", num_proc=num_workers)
-    split_dataset = dataset["trainaing"].train_test_split(test_size=0.5, seed=2357, shuffle=True)
+    split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
     split_dataset['val'] = split_dataset.pop('test')
 
     def encode(example):
@@ -49,7 +48,7 @@ def main():
             with tf.io.TFRecordWriter(file_path) as writer:
                 shard_ds = dst.shard(shards[split], i)
                 for example in shard_ds["ids"]:
-                    example = jnp.asarray(example, dtype=jnp.uint16)
+                    example = np.asarray(example, dtype=np.uint16)
                     example = make_tf_record_example(example)
                     writer.write(example.SerializeToString())
 
