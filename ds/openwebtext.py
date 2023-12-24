@@ -11,7 +11,6 @@ import multiprocessing
 
 
 def main():
-    encoder = tiktoken.get_encoding("gpt2")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--directory", default="data")
@@ -31,6 +30,7 @@ def main():
     split_dataset['val'] = split_dataset.pop('test')
 
     def encode(example):
+        encoder = tiktoken.get_encoding("gpt2")
         ids = encoder.encode_ordinary(example['text'])
         ids.append(encoder.eot_token)
         out = {'ids': ids, 'len': len(ids)}
