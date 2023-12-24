@@ -11,7 +11,6 @@ import multiprocessing
 
 
 def main():
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--directory", default="data")
     parser.add_argument("--num_valid_shards")
@@ -36,17 +35,21 @@ def main():
         out = {'ids': ids, 'len': len(ids)}
         return out
 
+    print("encoding ...")
+
     dataset = split_dataset.map(
         encode,
         remove_columns=['text'],
         num_proc=num_workers,
     )
 
+    print("saving as tf records ...")
     for split, dst in dataset.items():
         for i in range(shards[split]):
             file_path = os.path.join(directory, f"{split}_{i}.tfrecord")
             with tf.io.TFRecordWriter(file_path) as writer:
                 shard_ds = dst.shard(shards[split], i)
+                print(f"saving to {file_path} ...")
                 for example in shard_ds["ids"]:
                     example = np.asarray(example, dtype=np.uint16)
                     example = make_tf_record_example(example)
@@ -56,6 +59,7 @@ def main():
         upload_directory_with_transfer_manager(args.gcs_bucket, directory)
         shutil.rmtree(args.directory)
 
+    encoder = tiktoken.get_encoding("gpt2")
     print(f"vocab size: {encoder.n_vocab}")
 
 
