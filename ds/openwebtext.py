@@ -15,7 +15,7 @@ def main():
     parser.add_argument("--directory", default="data")
     parser.add_argument("--num_valid_shards")
     parser.add_argument("--num_train_shards")
-    parser.add_argument("--gcs_bucket", default="flash-nano-gpt-bucket")
+    parser.add_argument("--cache_dir")
     args = parser.parse_args()
 
     directory = os.path.join(args.directory, "openwebtext")
@@ -25,7 +25,7 @@ def main():
     shards = dict(train=args.num_train_shards, val=args.num_valid_shards)
 
     print("loading ...")
-    dataset = datasets.load_dataset("openwebtext", num_proc=num_workers)
+    dataset = datasets.load_dataset("openwebtext", num_proc=num_workers, cache_dir=args.cache_dir)
     split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
     split_dataset['val'] = split_dataset.pop('test')
 
