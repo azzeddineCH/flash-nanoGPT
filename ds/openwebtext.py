@@ -1,12 +1,11 @@
 import argparse
-import shutil
 
 import tiktoken
 import datasets
 import os
 import tensorflow as tf
 import numpy as np
-from utils import upload_directory_with_transfer_manager, make_tf_record_example
+from utils import  make_tf_record_example
 import multiprocessing
 
 
@@ -41,6 +40,7 @@ def main():
         encode,
         remove_columns=['text'],
         num_proc=num_workers,
+        load_from_cache_file=False # disable caching to save up space
     )
 
     print("saving ...")
@@ -54,10 +54,6 @@ def main():
                     example = np.asarray(example, dtype=np.uint16)
                     example = make_tf_record_example(example)
                     writer.write(example.SerializeToString())
-
-    if args.gcs_bucket:
-        upload_directory_with_transfer_manager(args.gcs_bucket, directory)
-        shutil.rmtree(args.directory)
 
     encoder = tiktoken.get_encoding("gpt2")
     print(f"vocab size: {encoder.n_vocab}")
