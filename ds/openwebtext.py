@@ -24,6 +24,7 @@ def main():
     num_workers = multiprocessing.cpu_count() // 2
     shards = dict(train=args.num_train_shards, val=args.num_valid_shards)
 
+    print("loading ...")
     dataset = datasets.load_dataset("openwebtext", num_proc=num_workers)
     split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
     split_dataset['val'] = split_dataset.pop('test')
@@ -36,14 +37,13 @@ def main():
         return out
 
     print("encoding ...")
-
     dataset = split_dataset.map(
         encode,
         remove_columns=['text'],
         num_proc=num_workers,
     )
 
-    print("saving as tf records ...")
+    print("saving ...")
     for split, dst in dataset.items():
         for i in range(shards[split]):
             file_path = os.path.join(directory, f"{split}_{i}.tfrecord")
