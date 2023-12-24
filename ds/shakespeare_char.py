@@ -1,6 +1,4 @@
 import os
-import shutil
-
 import jax.numpy as jnp
 import requests
 import argparse
@@ -11,8 +9,7 @@ from utils import upload_directory_with_transfer_manager, make_tf_record_example
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--directory", default="data")
-    parser.add_argument("--gcs_bucket", default="flash-nano-gpt-bucket")
+    parser.add_argument("--directory", type=str, default="data")
     args = parser.parse_args()
 
     directory = os.path.join(args.directory, "shakespeare-char")
@@ -40,12 +37,6 @@ def main():
         with tf.io.TFRecordWriter(file_path) as writer:
             example = make_tf_record_example(data)
             writer.write(example.SerializeToString())
-
-    if args.gcs_bucket:
-        upload_directory_with_transfer_manager(args.gcs_bucket, directory)
-        shutil.rmtree(args.directory)
-
-    print(f"vocab size: {vocab_size:,}")
 
 
 if __name__ == '__main__':

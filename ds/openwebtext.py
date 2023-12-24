@@ -5,16 +5,16 @@ import datasets
 import os
 import tensorflow as tf
 import numpy as np
-from utils import  make_tf_record_example
+from utils import make_tf_record_example
 import multiprocessing
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--directory", default="data")
-    parser.add_argument("--num_valid_shards")
-    parser.add_argument("--num_train_shards")
-    parser.add_argument("--cache_dir")
+    parser.add_argument("--directory", type=str, default="data")
+    parser.add_argument("--num_valid_shards", type=int)
+    parser.add_argument("--num_train_shards", type=int)
+    parser.add_argument("--cache_dir", type=str)
     args = parser.parse_args()
 
     directory = os.path.join(args.directory, "openwebtext")
@@ -39,8 +39,7 @@ def main():
     dataset = split_dataset.map(
         encode,
         remove_columns=['text'],
-        num_proc=num_workers,
-        load_from_cache_file=False # disable caching to save up space
+        num_proc=num_workers
     )
 
     print("saving ...")

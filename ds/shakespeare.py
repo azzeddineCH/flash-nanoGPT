@@ -1,7 +1,4 @@
-import multiprocessing
 import os
-import shutil
-
 import tiktoken
 import numpy as np
 import requests
@@ -13,8 +10,7 @@ from utils import upload_directory_with_transfer_manager, make_tf_record_example
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--directory", default="data")
-    parser.add_argument("--gcs_bucket", default="flash-nano-gpt-bucket")
+    parser.add_argument("--directory", default="data", type=str)
     args = parser.parse_args()
 
     directory = os.path.join(args.directory, "shakespeare")
@@ -38,10 +34,6 @@ def main():
         with tf.io.TFRecordWriter(file_path) as writer:
             example = make_tf_record_example(data)
             writer.write(example.SerializeToString())
-
-    if args.bucket:
-        upload_directory_with_transfer_manager(os.path.join(args.bucket, args.directory), directory)
-        shutil.rmtree(args.directory)
 
     print(f"vocab size: {encoder.n_vocab}")
 
