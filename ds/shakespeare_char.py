@@ -1,4 +1,3 @@
-import multiprocessing
 import os
 import shutil
 
@@ -7,7 +6,7 @@ import requests
 import argparse
 import tensorflow as tf
 
-from ds.utils import make_tf_record_example, upload_directory_with_transfer_manager
+from utils import upload_directory_with_transfer_manager, make_tf_record_example
 
 
 def main():
@@ -50,5 +49,4 @@ def main():
 
 
 if __name__ == '__main__':
-    multiprocessing.freeze_support()
     main()

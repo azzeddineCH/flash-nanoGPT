@@ -1,5 +1,4 @@
 import argparse
-import multiprocessing
 import shutil
 
 import tiktoken
@@ -8,7 +7,8 @@ import os
 import jax.numpy as jnp
 import tensorflow as tf
 
-from ds.utils import make_tf_record_example, upload_directory_with_transfer_manager
+from utils import upload_directory_with_transfer_manager, make_tf_record_example
+import multiprocessing
 
 
 def main():
@@ -16,18 +16,17 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--directory", default="data")
-    parser.add_argument("--num_valid_shards", default=2)
-    parser.add_argument("--num_train_shards", default=4)
-    parser.add_argument("--gcs_bucket", default=None)
+    parser.add_argument("--num_valid_shards")
+    parser.add_argument("--num_train_shards")
+    parser.add_argument("--gcs_bucket", default="flash-nano-gpt-bucket")
     args = parser.parse_args()
 
     directory = os.path.join(args.directory, "openwebtext")
     os.makedirs(directory, exist_ok=True)
 
-    num_workers = 8
+    num_workers = multiprocessing.cpu_count() // 2
     shards = dict(train=args.num_train_shards, val=args.num_valid_shards)
 
-    # ds = ds.load_dataset("openwebtext", num_proc=num_workers)
     dataset = datasets.load_dataset("openwebtext", num_proc=num_workers)
     split_dataset = dataset["trainaing"].train_test_split(test_size=0.5, seed=2357, shuffle=True)
     split_dataset['val'] = split_dataset.pop('test')
@@ -62,5 +61,4 @@ def main():
 
 
 if __name__ == '__main__':
-    multiprocessing.freeze_support()
     main()

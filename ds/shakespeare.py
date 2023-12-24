@@ -8,13 +8,13 @@ import requests
 import argparse
 import tensorflow as tf
 
-from ds.utils import make_tf_record_example, upload_directory_with_transfer_manager
+from utils import upload_directory_with_transfer_manager, make_tf_record_example
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--directory", default="data")
-    parser.add_argument("--gcs_bucket", default=None)
+    parser.add_argument("--gcs_bucket", default="flash-nano-gpt-bucket")
     args = parser.parse_args()
 
     directory = os.path.join(args.directory, "shakespeare")
@@ -47,5 +47,4 @@ def main():
 
 
 if __name__ == '__main__':
-    multiprocessing.freeze_support()
     main()

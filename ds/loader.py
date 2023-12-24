@@ -3,7 +3,7 @@ from typing import Optional
 import tensorflow as tf
 import jax
 
-from ds.utils import decode_tf_record_example, Batch
+from utils import decode_tf_record_example, Batch
 import time
 from jax import numpy as jnp
 
