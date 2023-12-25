@@ -1,11 +1,12 @@
+import argparse
 import os
-import tiktoken
+
 import numpy as np
 import requests
-import argparse
 import tensorflow as tf
+import tiktoken
 
-from utils import upload_directory_with_transfer_manager, make_tf_record_example
+from ds.utils import make_tf_record_example
 
 
 def main():
@@ -16,17 +17,17 @@ def main():
     directory = os.path.join(args.directory, "shakespeare")
     os.makedirs(directory, exist_ok=True)
 
-    url = 'https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt'
+    url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
     data = requests.get(url).text
 
     n = len(data)
-    train_data = data[:int(n * 0.9)]
-    val_data = data[int(n * 0.9):]
+    train_data = data[: int(n * 0.9)]
+    val_data = data[int(n * 0.9) :]
 
     encoder = tiktoken.get_encoding("gpt2")
     dataset = dict(
         train=np.array(encoder.encode_ordinary(train_data), dtype=np.uint16),
-        valid=np.array(encoder.encode_ordinary(val_data), dtype=np.uint16)
+        valid=np.array(encoder.encode_ordinary(val_data), dtype=np.uint16),
     )
 
     for name, data in dataset.items():
@@ -38,5 +39,5 @@ def main():
     print(f"vocab size: {encoder.n_vocab}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -1,12 +1,13 @@
 import argparse
-
-import tiktoken
-import datasets
-import os
-import tensorflow as tf
-import numpy as np
-from utils import make_tf_record_example
 import multiprocessing
+import os
+
+import datasets
+import numpy as np
+import tensorflow as tf
+import tiktoken
+
+from ds.utils import make_tf_record_example
 
 
 def main():
@@ -24,23 +25,23 @@ def main():
     shards = dict(train=args.num_train_shards, val=args.num_valid_shards)
 
     print("loading ...")
-    dataset = datasets.load_dataset("openwebtext", num_proc=num_workers, cache_dir=args.cache_dir)
-    split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
-    split_dataset['val'] = split_dataset.pop('test')
+    dataset = datasets.load_dataset(
+        "openwebtext", num_proc=num_workers, cache_dir=args.cache_dir
+    )
+    split_dataset = dataset["train"].train_test_split(
+        test_size=0.0005, seed=2357, shuffle=True
+    )
+    split_dataset["val"] = split_dataset.pop("test")
 
     def encode(example):
         encoder = tiktoken.get_encoding("gpt2")
-        ids = encoder.encode_ordinary(example['text'])
+        ids = encoder.encode_ordinary(example["text"])
         ids.append(encoder.eot_token)
-        out = {'ids': ids, 'len': len(ids)}
+        out = {"ids": ids, "len": len(ids)}
         return out
 
     print("encoding ...")
-    dataset = split_dataset.map(
-        encode,
-        remove_columns=['text'],
-        num_proc=num_workers
-    )
+    dataset = split_dataset.map(encode, remove_columns=["text"], num_proc=num_workers)
 
     print("saving ...")
     for split, dst in dataset.items():
@@ -58,5 +59,5 @@ def main():
     print(f"vocab size: {encoder.n_vocab}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -1,27 +1,27 @@
+import os
 from dataclasses import asdict
+from pathlib import Path
 from typing import Tuple
 
-from flax.struct import PyTreeNode
-from jax.experimental import mesh_utils
+import jax
+import jmp
 import optax
+import orbax.checkpoint as ocp
+from flax.struct import PyTreeNode
+from jax import numpy as jnp
+from jax import sharding as shx
+from jax import tree_util as trx
+from jax.experimental import mesh_utils
 from jax.random import PRNGKeyArray
 
 from config import Config, get_default_config
-from model import GPTConfig, GPT
-import jax
-
-from utils import Policy, TrainMetrics
 from ds.utils import Batch
-from state import TrainState
-import jmp
-from jax import numpy as jnp, tree_util as trx
-from jax import sharding as shx
-import os
-import orbax.checkpoint as ocp
+from training.model import GPT, GPTConfig
+from training.state import TrainState
+from training.utils import Policy, TrainMetrics
 
 
 class Trainer:
-
     def __init__(self, config: Config):
         self.config = config
 
@@ -32,7 +32,9 @@ class Trainer:
             param_dtype=jnp.float32,
             compute_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
             output_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
-            reduce_ops_dtype=jmp.half_dtype() if (self.on_tpu and self.config.amp) else jnp.float32,
+            reduce_ops_dtype=jmp.half_dtype()
+            if (self.on_tpu and self.config.amp)
+            else jnp.float32,
         )
 
         # ============= Sharding Policy ============= #
@@ -41,40 +43,52 @@ class Trainer:
         self.device_mesh = self._make_device_mesh()
 
         self.train_data_sharding = shx.NamedSharding(
-            self.device_mesh, spec=shx.PartitionSpec(None, "data")  # accumulation, batch, ...
+            self.device_mesh,
+            spec=shx.PartitionSpec(None, "data"),  # accumulation, batch, ...
         )
         self.valid_data_sharding = shx.NamedSharding(
-            self.device_mesh, spec=shx.PartitionSpec("data")  # batch, ...
+            self.device_mesh,
+            spec=shx.PartitionSpec("data"),  # batch, ...
         )
 
         self.state_sharding = shx.NamedSharding(
-            self.device_mesh, spec=shx.PartitionSpec()  # replicated
+            self.device_mesh,
+            spec=shx.PartitionSpec(),  # replicated
         )
 
         # ============= Jitting methods  ============= #
-        self.training_step = jax.jit(self._training_step) if config.jit else self._training_step
-        self.validation_step = jax.jit(self._validation_step) if config.jit else self._validation_step
-        self.make_train_state = jax.jit(self._make_train_state) if config.jit else self._make_train_state
+        self.training_step = (
+            jax.jit(self._training_step) if config.jit else self._training_step
+        )
+        self.validation_step = (
+            jax.jit(self._validation_step) if config.jit else self._validation_step
+        )
+        self.make_train_state = (
+            jax.jit(self._make_train_state) if config.jit else self._make_train_state
+        )
 
         # ============= Checkpointing ============= #
         os.makedirs(self.config.checkpoint_dir, exist_ok=True)
         self.checkpointer = ocp.CheckpointManager(
-            self.config.checkpoint_dir,
+            Path(self.config.checkpoint_dir).absolute(),
             checkpointers=dict(
                 state=ocp.PyTreeCheckpointer(),
-                train_metrics=ocp.PyTreeCheckpointer()
+                train_metrics=ocp.PyTreeCheckpointer(),
+                config=ocp.PyTreeCheckpointer(),
             ),
             options=ocp.CheckpointManagerOptions(
                 max_to_keep=3,
-                best_fn=lambda metrics: -metrics["loss"],
-            )
+                best_fn=lambda metrics: metrics["loss"],
+                best_mode="min",
+            ),
         )
 
     def _make_device_mesh(self) -> shx.Mesh:
         devices = jax.local_devices()
-        assert len(devices) >= self.config.num_devices, \
-            f"Not enough devices, requested {self.config.num_devices} found {len(devices)}"
-        devices = devices[:self.config.num_devices]
+        assert (
+            len(devices) >= self.config.num_devices
+        ), f"Not enough devices, requested {self.config.num_devices} found {len(devices)}"
+        devices = devices[: self.config.num_devices]
         devices = mesh_utils.create_device_mesh((len(devices), 1), devices=devices)
         mesh = shx.Mesh(devices, axis_names=("data", "state"))
         return mesh
@@ -88,7 +102,7 @@ class Trainer:
             embd_dim=self.config.embd_dim,
             dropout_rate=self.config.dropout_rate,
             use_bias=self.config.use_bias,
-            reduce_ops_dtype=self.policy.reduce_ops_dtype
+            reduce_ops_dtype=self.policy.reduce_ops_dtype,
         )
 
         key = jax.random.PRNGKey(0)
@@ -97,7 +111,7 @@ class Trainer:
             shape=(2, 8),
             minval=0,
             maxval=config.vocab_size,
-            dtype=jnp.int16 if self.config.amp else jnp.int32
+            dtype=jnp.int16 if self.config.amp else jnp.int32,
         )
         model = GPT(config)
         state = model.init(key, x=random_input, train=False)
@@ -105,13 +119,12 @@ class Trainer:
         return model, state["params"]
 
     def _make_optimizer(self, params: PyTreeNode) -> optax.MultiSteps:
-
         schedule = optax.warmup_cosine_decay_schedule(
             init_value=0.0,
             peak_value=self.config.lr,
             warmup_steps=self.config.lr_warmup_iters,
             decay_steps=self.config.lr_decay_iters,
-            end_value=self.config.lr_min
+            end_value=self.config.lr_min,
         )
 
         # we use "optax.inject_hyperparams" in order to track the learning rate
@@ -120,7 +133,7 @@ class Trainer:
             b1=self.config.beta1,
             b2=self.config.beta2,
             weight_decay=self.config.weight_decay,
-            mask=trx.tree_map(lambda p: p.ndim >= 2, params)
+            mask=trx.tree_map(lambda p: p.ndim >= 2, params),
         )
 
         optimizer = optax.chain(
@@ -129,8 +142,7 @@ class Trainer:
         )
 
         optimizer = optax.MultiSteps(
-            optimizer,
-            every_k_schedule=self.config.grad_accum_steps
+            optimizer, every_k_schedule=self.config.grad_accum_steps
         )
 
         return optimizer
@@ -144,8 +156,10 @@ class Trainer:
             apply_fn=model.apply,
             params=params,
             tx=optimizer,
-            loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0 ** 15)) if self.config.amp else jmp.NoOpLossScale(),
-            skip_infinite=self.config.skip_infinite
+            loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0**15))
+            if self.config.amp
+            else jmp.NoOpLossScale(),
+            skip_infinite=self.config.skip_infinite,
         )
 
         print(f"Train state created | model parameters : {state.num_params}")
@@ -154,8 +168,14 @@ class Trainer:
 
         return state
 
-    def _loss(self, rng_key: PRNGKeyArray, params: PyTreeNode, state: TrainState, batch: Batch,
-              train: bool = True) -> Tuple[float, float]:
+    def _loss(
+        self,
+        rng_key: PRNGKeyArray,
+        params: PyTreeNode,
+        state: TrainState,
+        batch: Batch,
+        train: bool = True,
+    ) -> Tuple[float, float]:
         """
         calculate the batch loss following these steps:
 
@@ -166,11 +186,12 @@ class Trainer:
         5 - scale loss to avoid non representative grad values when backprop
         """
 
-        logits = state.apply_fn({"params": params}, x=batch.inputs, train=train, rngs={"dropout": rng_key})
+        logits = state.apply_fn(
+            {"params": params}, x=batch.inputs, train=train, rngs={"dropout": rng_key}
+        )
 
         loss = optax.softmax_cross_entropy_with_integer_labels(
-            logits=self.policy.cast_to_reduce_ops(logits),
-            labels=batch.labels
+            logits=self.policy.cast_to_reduce_ops(logits), labels=batch.labels
         ).mean()
 
         if not train:
@@ -181,7 +202,9 @@ class Trainer:
         scaled_loss = self.policy.cast_to_compute(scaled_loss)
         return scaled_loss, loss
 
-    def _update(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch) -> Tuple[TrainState, TrainMetrics]:
+    def _update(
+        self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
+    ) -> Tuple[TrainState, TrainMetrics]:
         params = self.policy.cast_to_compute(state.params)
 
         (_, loss), grads = jax.value_and_grad(self._loss, argnums=1, has_aux=True)(
@@ -193,23 +216,28 @@ class Trainer:
         grads = self.policy.cast_to_param(grads)
         grads = state.loss_scale.unscale(grads)
 
-        state = state.apply_gradients(grads=grads, skip_infinite=self.config.skip_infinite)
+        state = state.apply_gradients(
+            grads=grads, skip_infinite=self.config.skip_infinite
+        )
 
         metrics = TrainMetrics(
             loss=loss,
             grads_gnorm=optax.global_norm(grads),
-            params_gnorm=optax.global_norm(params)
+            params_gnorm=optax.global_norm(params),
         )
 
         return state, metrics
 
-    def _training_step(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch) -> Tuple[TrainState, TrainMetrics]:
+    def _training_step(
+        self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
+    ) -> Tuple[TrainState, TrainMetrics]:
         batch = trx.tree_map(
             lambda x: x.reshape(
                 self.config.grad_accum_steps,
                 -1,
                 self.config.block_size,
-            ), batch
+            ),
+            batch,
         )
 
         batch = jax.device_put(batch, self.train_data_sharding)
@@ -222,7 +250,7 @@ class Trainer:
                 state=state,
             ),
             init=state,
-            xs=(rng_keys, batch)
+            xs=(rng_keys, batch),
         )
 
         metrics = trx.tree_map(lambda m: jnp.mean(m), metrics)
@@ -230,7 +258,9 @@ class Trainer:
 
         return state, metrics
 
-    def _validation_step(self, rng_key: jax.Array, state: TrainState, batch: Batch) -> float:
+    def _validation_step(
+        self, rng_key: jax.Array, state: TrainState, batch: Batch
+    ) -> float:
         params = self.policy.cast_to_compute(state.params)
         batch = jax.device_put(batch, self.valid_data_sharding)
 
@@ -239,29 +269,29 @@ class Trainer:
 
         return loss
 
-    def save(self, step: int, state: TrainState, metrics: TrainMetrics):
+    def save(self, state: TrainState, metrics: TrainMetrics):
         saved = self.checkpointer.save(
-            step,
+            state.step,
             items=dict(
                 state=state,
                 train_metrics=metrics,
                 config=asdict(self.config),
             ),
-            metrics=dict(loss=float(metrics.loss))
+            metrics=dict(loss=float(metrics.loss)),
         )
         if saved:
-            print(f"checkpoint saved ...{step}")
+            print(f"checkpoint saved ...{state.step}")
 
-    def restore(self, step=None) -> Tuple[TrainState, int]:
-        if not step:
-            step = self.checkpointer.best_step()
-
+    def restore(self) -> Tuple:
         ckpt = self.checkpointer.restore(
-            step,
+            self.checkpointer.best_step(),
             items=dict(
                 state=self.make_train_state(),
                 train_metrics=TrainMetrics(loss=0),
                 config=get_default_config(),
-            )
+            ),
         )
-        return ckpt["state"], step
+
+        ckpt.pop("config")  # todo: handle different model config
+
+        return ckpt["state"], ckpt["train_metrics"].loss

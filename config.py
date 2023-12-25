@@ -1,13 +1,15 @@
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
+
 import tyro
+
 
 @dataclass(frozen=True)
 class Config:
     # checkpoint and eval
     eval_freq: int
     eval_num_steps: int
-    save_checkpoint: int
+    save_checkpoint: bool
     restore: str  # scratch | pre-trained | gpt
     checkpoint_dir: str
     log_freq: int
@@ -49,7 +51,11 @@ class Config:
 
 def get_default_config():
     config_path = os.environ.get("GPT_CONFIG_PATH", "yaml/test-gpt.yaml")
-    assert os.path.exists(config_path), f"Can't find env variable 'gpt-config-path', f{config_path}"
+    assert os.path.exists(
+        config_path
+    ), f"Can't find env variable 'gpt-config-path', f{config_path}"
 
     with open(config_path, "r") as f:
         default_config = tyro.from_yaml(Config, f)
+
+    return default_config

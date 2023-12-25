@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
 import jax
-from flax import struct
 import jmp
+from flax import struct
 from jax import numpy as jnp
 from jmp._src.policy import _cast_floating_to
 

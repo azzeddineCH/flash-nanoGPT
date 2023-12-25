@@ -9,3 +9,6 @@ optax
 git+https://github.com/deepmind/jmp
 wandb
 datasets
+ruff
+pre-commit
+isort

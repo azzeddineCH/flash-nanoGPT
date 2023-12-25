@@ -1,7 +1,7 @@
 import jax
-from flax.training.train_state import TrainState as _TrainState
 import jmp
 import optax
+from flax.training.train_state import TrainState as _TrainState
 
 
 class TrainState(_TrainState):
@@ -22,13 +22,11 @@ class TrainState(_TrainState):
             grads_finite = jmp.all_finite(grads)
             loss_scale = self.loss_scale.adjust(grads_finite)
             new_params, new_opt_state = jmp.select_tree(
-                grads_finite,
-                (new_params, new_opt_state),
-                (self.params, self.opt_state)
+                grads_finite, (new_params, new_opt_state), (self.params, self.opt_state)
             )
 
         return self.replace(
-            step=self.step + 1,
+            step=new_opt_state.gradient_step,
             params=new_params,
             opt_state=new_opt_state,
             loss_scale=loss_scale,
