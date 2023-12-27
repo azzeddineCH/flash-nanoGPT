@@ -150,7 +150,7 @@ class Trainer:
             apply_fn=model.apply,
             params=params,
             tx=optimizer,
-            loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0**15))
+            loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0**15, dtype=jnp.float32))
             if self.config.amp
             else jmp.NoOpLossScale(),
             skip_infinite=self.config.skip_infinite,
@@ -182,19 +182,21 @@ class Trainer:
         """
 
         logits = state.apply_fn(
-            {"params": params}, x=batch.inputs, train=train, rngs={"dropout": rng_key}
+            variables={"params": params},
+            x=batch.inputs,
+            train=train,
+            rngs={"dropout": rng_key},
         )
 
         loss = optax.softmax_cross_entropy_with_integer_labels(
             logits=self.policy.cast_to_reduce_ops(logits), labels=batch.labels
         ).mean()
 
+        loss = self.policy.cast_to_output(loss)
         if not train:
             return loss
 
-        # scale the loss before casting to half precision to avoid losing precision
         scaled_loss = state.loss_scale.scale(loss)
-        scaled_loss = self.policy.cast_to_compute(scaled_loss)
         return scaled_loss, loss
 
     def _validation_loss(self, _rng_key, _state, _batch):
@@ -210,8 +212,6 @@ class Trainer:
             rng_key, params, state, batch
         )
 
-        # before unscaling the grads, cast them into full precision to avoid non representative values post unscaling
-        # this common when using GPUs float16 and less common when using TPUs bfloat16
         grads = self.policy.cast_to_param(grads)
         grads = state.loss_scale.unscale(grads)
 

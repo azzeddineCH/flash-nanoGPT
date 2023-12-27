@@ -95,7 +95,7 @@ for _ in range(start_iter, config.num_iters):
 
     # ============= Evaluation ============= #
 
-    if train_state.step % config.eval_freq == 0:
+    if train_state.step == 1 or train_state.step % config.eval_freq == 0:
         valid_loss = train_loss = 0
         train_eval_key, valid_eval_key, training_key = jax.random.split(training_key, 3)
         for j in range(config.eval_num_steps):
@@ -131,7 +131,7 @@ for _ in range(start_iter, config.num_iters):
             best_valid_loss = valid_loss
             if jax.process_index() == 0:
                 print(
-                    f"iter {train_state.step} |  val loss {valid_loss} | train loss {train_loss}"
+                    f"iter: {train_state.step} |  val loss {valid_loss} | train loss {train_loss}"
                 )
                 if config.save_checkpoint:
                     trainer.save(train_state, metrics=TrainMetrics(loss=valid_loss))
@@ -140,8 +140,7 @@ for _ in range(start_iter, config.num_iters):
 
     if train_state.step % config.log_freq == 0 and jax.process_index() == 0:
         print(
-            f"iter: {train_state.step} | " f"loss: {train_metrics.loss} | ",
-            f"time_ms: {step_time_s * 1000}",
+            f"iter: {train_state.step} | loss: {train_metrics.loss} | time_ms: {step_time_s * 1000}"
         )
 
 if config.wandb and jax.process_index() == 0:

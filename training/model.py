@@ -195,9 +195,7 @@ class GPT(nn.Module):
         batch, seq_length = x.shape
         assert seq_length <= self.config.block_size
 
-        positions = self.positional_embeddings(
-            jnp.arange(0, stop=seq_length, step=1, dtype=x.dtype)
-        )
+        positions = self.positional_embeddings(jnp.arange(0, stop=seq_length, step=1))
         embeddings = self.token_embeddings(x) + positions
         embeddings = self.dropout(embeddings, deterministic=not train)
         for block in self.blocks:
