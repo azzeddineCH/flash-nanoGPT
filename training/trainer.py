@@ -62,6 +62,10 @@ class Trainer:
             jax.jit(self._update_loop) if config.jit else self._update_loop
         )
 
+        self.validation_loss = (
+            jax.jit(self._validation_loss) if config.jit else self._validation_loss
+        )
+
         # ============= Checkpointing ============= #
         os.makedirs(self.config.checkpoint_dir, exist_ok=True)
         self.checkpointer = ocp.CheckpointManager(
@@ -138,27 +142,20 @@ class Trainer:
         return optimizer
 
     def make_train_state(self, apply_sharding: bool = True) -> TrainState:
-        # ============= jitting body fn ============= #
-        def _body_fn():
-            model, params = self._make_model()
+        model, params = self._make_model()
 
-            optimizer = self._make_optimizer(params)
+        optimizer = self._make_optimizer(params)
 
-            state = TrainState.create(
-                apply_fn=model.apply,
-                params=params,
-                tx=optimizer,
-                loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0**15))
-                if self.config.amp
-                else jmp.NoOpLossScale(),
-                skip_infinite=self.config.skip_infinite,
-            )
+        state = TrainState.create(
+            apply_fn=model.apply,
+            params=params,
+            tx=optimizer,
+            loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0**15))
+            if self.config.amp
+            else jmp.NoOpLossScale(),
+            skip_infinite=self.config.skip_infinite,
+        )
 
-            return state
-
-        # ======================================== #
-
-        state = jax.jit(_body_fn)() if self.config.jit else _body_fn()
         print(f"Train state created | model parameters : {state.num_params}")
 
         if apply_sharding:
@@ -199,6 +196,10 @@ class Trainer:
         scaled_loss = state.loss_scale.scale(loss)
         scaled_loss = self.policy.cast_to_compute(scaled_loss)
         return scaled_loss, loss
+
+    def _validation_loss(self, _rng_key, _state, _batch):
+        params = self.policy.cast_to_compute(_state.params)
+        return self._loss(_rng_key, params, _state, _batch, train=False)
 
     def _update(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
@@ -279,17 +280,8 @@ class Trainer:
     def validation_step(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> float:
-        # ============= jitting body fn ============= #
-        def _body_fn(_params, _state, _batch):
-            return self._loss(rng_key, params, state, batch, train=False)
-
-        body_fn = jax.jit(_body_fn) if self.config.jit else _body_fn
-
-        # =========================================== #
-
-        params = self.policy.cast_to_compute(state.params)
         batch = jax.device_put(batch, self.valid_data_sharding)
-        loss_value = body_fn(params, state, batch)
+        loss_value = self.validation_loss(rng_key, state, batch)
         loss_value = jax.device_put(loss_value, self.host)
 
         return loss_value
