@@ -4,7 +4,8 @@ from typing import Iterator, Optional
 import jax
 import tensorflow as tf
 from jax import numpy as jnp
-from utils import Batch, decode_tf_record_example
+
+from ds.utils import Batch, decode_tf_record_example
 
 
 class DataLoader:
