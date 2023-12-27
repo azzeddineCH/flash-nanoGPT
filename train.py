@@ -23,7 +23,7 @@ if config.multi_host:
 
 if jax.process_index() == 0:
     print(
-        f"TPU pod initialized, {jax.process_count()} processes, {len(jax.local_devices())} TPU core per device "
+        f"TPU pod initialized, {jax.process_count()} host/s, {len(jax.local_devices())} TPUs core per host"
     )
 
 # ============= Init Logging ============= #
@@ -70,14 +70,15 @@ validation_data_iter = DataLoader(
 
 trainer = Trainer(config=config)
 
+start_iter = 0
+best_valid_loss = 1e6
 if config.restore == "scratch":
     train_state = trainer.make_train_state()
-    start_iter = 0
-    best_valid_loss = 1e6
 elif config.restore == "pre-trained":
     train_state, best_valid_loss = trainer.restore()
     start_iter = train_state.step + 1
-else:
+elif config.restore == "gpt-2":
+    train_state = trainer.restore_openai_gpt()
     raise ValueError(f"unknown restore method {config.restore}")
 
 # ============= Training Loop ============= #
@@ -126,13 +127,14 @@ for _ in range(start_iter, config.num_iters):
                 }
             )
 
-        if config.save_checkpoint and valid_loss < best_valid_loss:
+        if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
             if jax.process_index() == 0:
                 print(
                     f"iter {train_state.step} |  val loss {valid_loss} | train loss {train_loss}"
                 )
-                trainer.save(train_state, metrics=TrainMetrics(loss=valid_loss))
+                if config.save_checkpoint:
+                    trainer.save(train_state, metrics=TrainMetrics(loss=valid_loss))
 
     # ============= Logging ============= #
 

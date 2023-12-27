@@ -323,3 +323,6 @@ class Trainer:
         ckpt.pop("config")  # todo: handle different model config
 
         return state, loss
+
+    def restore_openai_gpt(self):
+        pass
