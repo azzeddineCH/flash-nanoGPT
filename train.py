@@ -13,12 +13,22 @@ from training.utils import TrainMetrics
 
 # ============= Init configs ============= #
 
-
 config = tyro.cli(Config, default=get_default_config())
+
+# ============= Init the cluster for multi-processing environment ============= #
+
+# this script is handling TPU pods, for GPU cluster check: https://jax.readthedocs.io/en/latest/multi_process.html
+if config.multi_host:
+    jax.distributed.initialize()
+
+if jax.process_index() == 0:
+    print(
+        f"TPU pod initialized, {jax.process_count()} processes, {len(jax.local_devices())} TPU core per device "
+    )
 
 # ============= Init Logging ============= #
 
-if config.wandb:
+if config.wandb and jax.process_index() == 0:
     wandb.init(
         project=config.wandb_project_name,
         name=config.wandb_run_id,
@@ -34,21 +44,25 @@ data_rng_key, training_key, key = jax.random.split(key, 3)
 
 train_data_iter = DataLoader(
     directory=config.dataset_dir,
-    batch_size=config.batch_size,
+    batch_size=config.batch_size // jax.process_count(),
     block_size=config.block_size,
     split="train",
     prefetch=config.prefetch,
     buffer_size=config.buffer_size,
+    num_shards=jax.process_count(),
+    shard=jax.process_index(),
     num_workers=multiprocessing.cpu_count() // 2,
 ).get_iterator()
 
 validation_data_iter = DataLoader(
     directory=config.dataset_dir,
-    batch_size=config.batch_size,
+    batch_size=config.batch_size // jax.process_count(),
     block_size=config.block_size,
     split="val",
     prefetch=config.prefetch,
     buffer_size=config.buffer_size,
+    num_shards=jax.process_count(),
+    shard=jax.process_index(),
     num_workers=multiprocessing.cpu_count() // 2,
 ).get_iterator()
 
@@ -81,8 +95,7 @@ for _ in range(start_iter, config.num_iters):
     # ============= Evaluation ============= #
 
     if train_state.step % config.eval_freq == 0:
-        valid_loss = 0
-        train_loss = 0
+        valid_loss = train_loss = 0
         train_eval_key, valid_eval_key, training_key = jax.random.split(training_key, 3)
         for j in range(config.eval_num_steps):
             valid_loss += (
@@ -99,7 +112,7 @@ for _ in range(start_iter, config.num_iters):
                 / config.eval_num_steps
             )
 
-        if config.wandb:
+        if config.wandb and jax.process_index() == 0:
             wandb.log(
                 {
                     "iter": train_state.step,
@@ -114,19 +127,20 @@ for _ in range(start_iter, config.num_iters):
             )
 
         if config.save_checkpoint and valid_loss < best_valid_loss:
-            print(
-                f"iter {train_state.step} |  val loss {valid_loss} | train loss {train_loss}"
-            )
-            trainer.save(train_state, metrics=TrainMetrics(loss=valid_loss))
             best_valid_loss = valid_loss
+            if jax.process_index() == 0:
+                print(
+                    f"iter {train_state.step} |  val loss {valid_loss} | train loss {train_loss}"
+                )
+                trainer.save(train_state, metrics=TrainMetrics(loss=valid_loss))
 
     # ============= Logging ============= #
 
-    if train_state.step % config.log_freq == 0:
+    if train_state.step % config.log_freq == 0 and jax.process_index() == 0:
         print(
             f"iter: {train_state.step} | " f"loss: {train_metrics.loss} | ",
-            f"time_ms: {step_time_s * 1000} | ",
+            f"time_ms: {step_time_s * 1000}",
         )
 
-if config.wandb:
+if config.wandb and jax.process_index() == 0:
     wandb.finish()

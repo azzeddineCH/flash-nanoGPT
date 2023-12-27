@@ -44,9 +44,8 @@ class Config:
     grad_accum_steps: int
     amp: bool
     skip_infinite: bool
-    device: str
     jit: bool
-    num_devices: int
+    multi_host: bool
 
 
 def get_default_config():

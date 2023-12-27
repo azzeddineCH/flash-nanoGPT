@@ -37,6 +37,5 @@ grad_clip: 1.0
 grad_accum_steps: 1
 amp: false
 skip_infinite: true
-device: "tpu" # gpu | tpu | cpu
 jit: false
-num_devices: 1
+multi_host: false

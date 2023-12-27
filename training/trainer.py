@@ -43,11 +43,12 @@ class Trainer:
         self.device_mesh = self._make_device_mesh()
 
         self.train_data_sharding = shx.NamedSharding(
-            self.device_mesh,
+            self.device_mesh.local_mesh,
             spec=shx.PartitionSpec(None, "data"),  # accumulation, batch, ...
         )
+
         self.valid_data_sharding = shx.NamedSharding(
-            self.device_mesh,
+            self.device_mesh.local_mesh,
             spec=shx.PartitionSpec("data"),  # batch, ...
         )
 
@@ -57,14 +58,8 @@ class Trainer:
         )
 
         # ============= Jitting methods  ============= #
-        self.training_step = (
-            jax.jit(self._training_step) if config.jit else self._training_step
-        )
-        self.validation_step = (
-            jax.jit(self._validation_step) if config.jit else self._validation_step
-        )
-        self.make_train_state = (
-            jax.jit(self._make_train_state) if config.jit else self._make_train_state
+        self.update_loop = (
+            jax.jit(self._update_loop) if config.jit else self._update_loop
         )
 
         # ============= Checkpointing ============= #
@@ -84,13 +79,8 @@ class Trainer:
         )
 
     def _make_device_mesh(self) -> shx.Mesh:
-        devices = jax.local_devices()
-        assert (
-            len(devices) >= self.config.num_devices
-        ), f"Not enough devices, requested {self.config.num_devices} found {len(devices)}"
-        devices = devices[: self.config.num_devices]
-        devices = mesh_utils.create_device_mesh((len(devices), 1), devices=devices)
-        mesh = shx.Mesh(devices, axis_names=("data", "state"))
+        devices = mesh_utils.create_device_mesh((len(jax.devices()),))
+        mesh = shx.Mesh(devices, axis_names=("data",))
         return mesh
 
     def _make_model(self) -> Tuple[GPT, PyTreeNode]:
@@ -147,24 +137,32 @@ class Trainer:
 
         return optimizer
 
-    def _make_train_state(self) -> TrainState:
-        model, params = self._make_model()
+    def make_train_state(self, apply_sharding: bool = True) -> TrainState:
+        # ============= jitting body fn ============= #
+        def _body_fn():
+            model, params = self._make_model()
 
-        optimizer = self._make_optimizer(params)
+            optimizer = self._make_optimizer(params)
 
-        state = TrainState.create(
-            apply_fn=model.apply,
-            params=params,
-            tx=optimizer,
-            loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0**15))
-            if self.config.amp
-            else jmp.NoOpLossScale(),
-            skip_infinite=self.config.skip_infinite,
-        )
+            state = TrainState.create(
+                apply_fn=model.apply,
+                params=params,
+                tx=optimizer,
+                loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0**15))
+                if self.config.amp
+                else jmp.NoOpLossScale(),
+                skip_infinite=self.config.skip_infinite,
+            )
 
+            return state
+
+        # ======================================== #
+
+        state = jax.jit(_body_fn)() if self.config.jit else _body_fn()
         print(f"Train state created | model parameters : {state.num_params}")
 
-        state = jax.device_put(state, self.state_sharding)
+        if apply_sharding:
+            state = jax.device_put(state, self.state_sharding)
 
         return state
 
@@ -228,21 +226,8 @@ class Trainer:
 
         return state, metrics
 
-    def _training_step(
-        self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
-    ) -> Tuple[TrainState, TrainMetrics]:
-        batch = trx.tree_map(
-            lambda x: x.reshape(
-                self.config.grad_accum_steps,
-                -1,
-                self.config.block_size,
-            ),
-            batch,
-        )
-
-        batch = jax.device_put(batch, self.train_data_sharding)
+    def _update_loop(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch):
         rng_keys = jax.random.split(rng_key, self.config.grad_accum_steps)
-
         state, metrics = jax.lax.scan(
             f=lambda state, xs: self._update(
                 rng_key=xs[0],
@@ -252,24 +237,65 @@ class Trainer:
             init=state,
             xs=(rng_keys, batch),
         )
-
         metrics = trx.tree_map(lambda m: jnp.mean(m), metrics)
-        metrics = jax.device_put(metrics, self.host)
-
         return state, metrics
 
-    def _validation_step(
-        self, rng_key: jax.Array, state: TrainState, batch: Batch
+    def training_step(
+        self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
+    ) -> Tuple[TrainState, TrainMetrics]:
+        # ============= adding grad accumulation dim ============= #
+        batch = trx.tree_map(
+            lambda x: x.reshape(
+                self.config.grad_accum_steps,
+                -1,
+                self.config.block_size,
+            ),
+            batch,
+        )
+
+        # ============= sharding the batch ============= #
+        batch = jax.device_put(batch, self.train_data_sharding)
+        if self.config.multi_host:
+            # =============  create a global batch array sharded across the mesh ============= #
+            batch = jax.tree_map(
+                lambda data: jax.make_array_from_single_device_arrays(
+                    shape=(
+                        self.config.batch_size * jax.process_count(),
+                        self.config.block_size,
+                    ),
+                    sharding=shx.NamedSharding(
+                        mesh=self.device_mesh, spec=shx.PartitionSpec(None, "data")
+                    ),
+                    arrays=[data],
+                ),
+                batch,
+            )
+
+        # ============= running update loop on grad_accum dim ============= #
+        state, metrics = self.update_loop(rng_key, state, batch)
+        metrics = jax.device_put(metrics, self.host)
+        return state, metrics
+
+    def validation_step(
+        self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> float:
+        # ============= jitting body fn ============= #
+        def _body_fn(_params, _state, _batch):
+            return self._loss(rng_key, params, state, batch, train=False)
+
+        body_fn = jax.jit(_body_fn) if self.config.jit else _body_fn
+
+        # =========================================== #
+
         params = self.policy.cast_to_compute(state.params)
         batch = jax.device_put(batch, self.valid_data_sharding)
+        loss_value = body_fn(params, state, batch)
+        loss_value = jax.device_put(loss_value, self.host)
 
-        loss = self._loss(rng_key, params, state, batch, train=False)
-        loss = jax.device_put(loss, self.host)
-
-        return loss
+        return loss_value
 
     def save(self, state: TrainState, metrics: TrainMetrics):
+        state = jax.device_put(state, self.host)
         saved = self.checkpointer.save(
             state.step,
             items=dict(
@@ -286,12 +312,14 @@ class Trainer:
         ckpt = self.checkpointer.restore(
             self.checkpointer.best_step(),
             items=dict(
-                state=self.make_train_state(),
+                state=self.make_train_state(apply_sharding=False),
                 train_metrics=TrainMetrics(loss=0),
                 config=get_default_config(),
             ),
         )
 
+        state = jax.device_put(ckpt["state"], self.state_sharding)
+        loss = ckpt["train_metrics"].loss
         ckpt.pop("config")  # todo: handle different model config
 
-        return ckpt["state"], ckpt["train_metrics"].loss
+        return state, loss
