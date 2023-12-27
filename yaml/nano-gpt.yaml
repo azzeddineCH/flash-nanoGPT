@@ -1,17 +1,18 @@
 !dataclass:Config
 # checkpoint and eval
-eval_freq: 2000
-eval_num_steps: 10
+eval_freq: 1000
+eval_num_steps: 200
 save_checkpoint: false
 restore: "scratch"  # scratch | pre-trained | gpt
 checkpoint_dir: "checkpoints"
-log_freq: 1
+log_freq: 10
 wandb: true
 wandb_project_name: "flash-nano-gpt"
 wandb_run_id: "flash-nanoGPT-1"
 # data
 dataset_dir: "data/shakespeare"
 vocab_size: 50304
+grad_accum_steps: 40
 batch_size: 12
 block_size: 1024
 buffer_size: 5
@@ -23,18 +24,17 @@ embd_dim: 768
 dropout_rate: 0.2
 use_bias: false
 # Optimizer
-num_iters: 1000
+num_iters: 600000
 lr: 0.0006
 lr_decay: true
 lr_warmup_iters: 200
-lr_decay_iters: 1000
+lr_decay_iters: 600000
 lr_min: 0.00006
 weight_decay: 0.1
 beta1: 0.9
 beta2: 0.95
 grad_clip: 1.0
 # training
-grad_accum_steps: 40
 amp: true
 skip_infinite: true
 jit: true
