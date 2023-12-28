@@ -84,9 +84,10 @@ for i in range(start_iter, config.num_iters):
 
     t0 = time.time()
     train_batch_key, train_step_key, training_key = jax.random.split(training_key, 3)
-    train_state, train_metrics = trainer.training_step(
-        train_step_key, train_state, batch=next(train_data_iter)
-    )
+    # train_state, train_metrics = trainer.training_step(
+    #     train_step_key, train_state, batch=next(train_data_iter)
+    # )
+    train_metrics = TrainMetrics(loss=0.0)
     step_time_s = time.time() - t0
 
     # ============= Evaluation ============= #
@@ -95,19 +96,19 @@ for i in range(start_iter, config.num_iters):
         valid_loss = train_loss = 0
         train_eval_key, valid_eval_key, training_key = jax.random.split(training_key, 3)
         for j in range(config.eval_num_steps):
-            valid_loss += (
-                trainer.validation_step(
-                    train_step_key, train_state, batch=next(validation_data_iter)
-                )
-                / config.eval_num_steps
-            )
-
-            train_loss += (
-                trainer.validation_step(
-                    train_step_key, train_state, batch=next(train_data_iter)
-                )
-                / config.eval_num_steps
-            )
+            # valid_loss += (
+            #         trainer.validation_step(
+            #             train_step_key, train_state, batch=next(validation_data_iter)
+            #         )
+            #         / config.eval_num_steps
+            # )
+            #
+            # train_loss += (
+            #         trainer.validation_step(
+            #             train_step_key, train_state, batch=next(train_data_iter)
+            #         )
+            #         / config.eval_num_steps
+            # )
             pass
 
         if config.wandb and jax.process_index() == 0:
