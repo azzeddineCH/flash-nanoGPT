@@ -84,7 +84,9 @@ class Trainer:
         )
 
     def _make_device_mesh(self) -> shx.Mesh:
-        devices = mesh_utils.create_device_mesh((len(jax.local_devices()),))
+        devices = mesh_utils.create_device_mesh(
+            (len(jax.local_devices()),), devices=jax.local_devices()
+        )
         mesh = shx.Mesh(devices, axis_names=("data",))
         return mesh
 
