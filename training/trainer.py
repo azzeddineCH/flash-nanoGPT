@@ -285,9 +285,9 @@ class Trainer:
         )
 
         # ============= running update loop on grad_accum dim ============= #
-        # state, metrics = self.update_loop(rng_key, state, batch)
-        # metrics = jax.device_put(metrics, self.host)
-        metrics = TrainMetrics(loss=0)
+        state, metrics = self.update_loop(rng_key, state, batch)
+        metrics = jax.device_put(metrics, self.host)
+
         return state, metrics
 
     def validation_step(
