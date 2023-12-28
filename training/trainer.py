@@ -241,9 +241,9 @@ class Trainer:
         grads = self.policy.cast_to_param(grads)
         grads = state.loss_scale.unscale(grads)
 
-        grads = jax.tree_util.tree_map(
-            lambda g: jax.lax.pmean(g, axis_name="data"), grads
-        )
+        # grads = jax.tree_util.tree_map(
+        #     lambda g: jax.lax.pmean(g, axis_name="data"), grads
+        # )
 
         state = state.apply_gradients(
             grads=grads, skip_infinite=self.config.skip_infinite
