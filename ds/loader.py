@@ -32,11 +32,10 @@ class DataLoader:
 
         # from ds.utils import decode_tf_record_example
 
-        file_ds = tf.data.Dataset.list_files(
-            f"{self.directory}/{self.split}*.tfrecord"
-        ).shard(num_shards=self.num_shards, index=self.shard)
+        file_ds = tf.data.Dataset.list_files(f"{self.directory}/{self.split}*.tfrecord")
+        print(file_ds)
 
-        print(file_ds, "<----", self.num_workers)
+        file_ds = file_ds.shard(num_shards=self.num_shards, index=self.shard)
 
         dataset = (
             tf.data.TFRecordDataset(
