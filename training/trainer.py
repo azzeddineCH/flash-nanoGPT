@@ -285,17 +285,18 @@ class Trainer:
         )
 
         # ============= running update loop on grad_accum dim ============= #
-        state, metrics = self.update_loop(rng_key, state, batch)
-        metrics = jax.device_put(metrics, self.host)
+        # state, metrics = self.update_loop(rng_key, state, batch)
+        # metrics = jax.device_put(metrics, self.host)
+        metrics = TrainMetrics(loss=0)
         return state, metrics
 
     def validation_step(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> float:
-        loss = self.validation_loss(rng_key, state, batch)
+        # loss = self.validation_loss(rng_key, state, batch)
 
-        loss = jax.device_put(loss, self.host)
-
+        # loss = jax.device_put(loss, self.host)
+        loss = 0.0
         return loss
 
     def save(self, state: TrainState, metrics: TrainMetrics):
