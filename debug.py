@@ -3,10 +3,10 @@ import multiprocessing
 
 import jax
 import tyro
-from loader import DataLoader
 
 import wandb
 from config import Config, get_default_config
+from ds.loader import DataLoader
 from training.trainer import Trainer
 
 # import multiprocessing
