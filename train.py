@@ -79,12 +79,12 @@ validation_data_iter = DataLoader(
 
 # ============= Training Loop ============= #
 
-for _ in range(start_iter, config.num_iters):
+for i in range(start_iter, config.num_iters):
     # ============= Training ============= #
 
     t0 = time.time()
     train_batch_key, train_step_key, training_key = jax.random.split(training_key, 3)
-    print(next(train_data_iter).inputs.shape)
+    print("---->", i)
     # train_state, train_metrics = trainer.training_step(
     #     train_step_key, train_state, batch=next(train_data_iter)
     # )

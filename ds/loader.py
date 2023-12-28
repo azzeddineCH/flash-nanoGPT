@@ -41,6 +41,7 @@ class DataLoader:
                 # build a tf Dataset from data files
                 filenames=file_ds,
                 num_parallel_reads=self.num_workers,
+                buffer_size=500,  # MB
             )
             .map(
                 # decode each of the tfrecords
