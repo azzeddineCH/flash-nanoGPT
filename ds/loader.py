@@ -60,7 +60,8 @@ class DataLoader:
             .shuffle(self.buffer_size)
             .batch(
                 # batch the dataset to get the shape of (batch_size, block_size)
-                self.batch_size
+                self.batch_size,
+                drop_remainder=True,
             )
             .shuffle(self.buffer_size)
             .prefetch(
