@@ -1,7 +1,12 @@
+import dataclasses
+import multiprocessing
+
 import jax
 import tyro
 
+import wandb
 from config import Config, get_default_config
+from ds.loader import DataLoader
 from training.trainer import Trainer
 
 if jax.process_index() == 0:
@@ -13,10 +18,47 @@ if jax.process_index() == 0:
 
 config = tyro.cli(Config, default=get_default_config())
 
+# ============= Init Logging ============= #
+
+if config.wandb and jax.process_index() == 0:
+    wandb.init(
+        project=config.wandb_project_name,
+        name=config.wandb_run_id,
+        config=dataclasses.asdict(config),
+    )
+
 # ============= Init Random keys loaders ============= #
 
 key = jax.random.PRNGKey(0)
 data_rng_key, training_key, key = jax.random.split(key, 3)
+
+# ============= Init ds loaders ============= #
+if jax.process_index() == 0:
+    print("Loading dataset ...")
+
+train_data_iter = DataLoader(
+    directory=config.dataset_dir,
+    batch_size=config.batch_size // jax.process_count(),
+    block_size=config.block_size,
+    split="train",
+    prefetch=config.prefetch,
+    buffer_size=config.buffer_size,
+    num_shards=jax.process_count(),
+    shard=jax.process_index(),
+    num_workers=multiprocessing.cpu_count() // 2,
+).get_iterator()
+
+validation_data_iter = DataLoader(
+    directory=config.dataset_dir,
+    batch_size=config.batch_size // jax.process_count(),
+    block_size=config.block_size,
+    split="val",
+    prefetch=config.prefetch,
+    buffer_size=config.buffer_size,
+    num_shards=jax.process_count(),
+    shard=jax.process_index(),
+    num_workers=multiprocessing.cpu_count() // 4,
+).get_iterator()
 
 # ============= Init training state ============= #
 
