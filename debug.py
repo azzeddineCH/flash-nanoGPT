@@ -36,30 +36,6 @@ data_rng_key, training_key, key = jax.random.split(key, 3)
 if jax.process_index() == 0:
     print("Loading dataset ...")
 
-train_data_iter = DataLoader(
-    directory=config.dataset_dir,
-    batch_size=config.batch_size // jax.process_count(),
-    block_size=config.block_size,
-    split="train",
-    prefetch=config.prefetch,
-    buffer_size=config.buffer_size,
-    num_shards=jax.process_count(),
-    shard=jax.process_index(),
-    num_workers=multiprocessing.cpu_count() // 2,
-).get_iterator()
-
-validation_data_iter = DataLoader(
-    directory=config.dataset_dir,
-    batch_size=config.batch_size // jax.process_count(),
-    block_size=config.block_size,
-    split="val",
-    prefetch=config.prefetch,
-    buffer_size=config.buffer_size,
-    num_shards=jax.process_count(),
-    shard=jax.process_index(),
-    num_workers=multiprocessing.cpu_count() // 4,
-).get_iterator()
-
 # ============= Init training state ============= #
 
 trainer = Trainer(config=config)
@@ -74,3 +50,29 @@ elif config.restore == "pre-trained":
 elif config.restore == "gpt-2":
     train_state = trainer.restore_openai_gpt()
     raise ValueError(f"unknown restore method {config.restore}")
+
+# ============= Init ds loaders ============= #
+
+train_data_iter = DataLoader(
+    directory=config.dataset_dir,
+    batch_size=config.batch_size // jax.process_count(),
+    block_size=config.block_size,
+    split="train",
+    prefetch=config.prefetch,
+    buffer_size=config.buffer_size,
+    num_shards=jax.process_count(),
+    shard=jax.process_index(),
+    num_workers=multiprocessing.cpu_count() // 2,
+).get_iterator()
+
+# validation_data_iter = DataLoader(
+#     directory=config.dataset_dir,
+#     batch_size=config.batch_size // jax.process_count(),
+#     block_size=config.block_size,
+#     split="val",
+#     prefetch=config.prefetch,
+#     buffer_size=config.buffer_size,
+#     num_shards=jax.process_count(),
+#     shard=jax.process_index(),
+#     num_workers=multiprocessing.cpu_count() // 4,
+# ).get_iterator()
