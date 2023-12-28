@@ -29,7 +29,9 @@ class Trainer:
         self.on_tpu = jax.local_devices()[0].platform == "tpu"
 
         self.policy = Policy(
-            param_dtype=jnp.float32,
+            param_dtype=jmp.half_dtype()
+            if (self.on_tpu and self.config.amp)
+            else jnp.float32,
             compute_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
             output_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
             reduce_ops_dtype=jmp.half_dtype()
@@ -176,7 +178,7 @@ class Trainer:
             params=params,
             tx=optimizer,
             loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0**15, dtype=jnp.float32))
-            if self.config.amp
+            if self.config.amp and not self.on_tpu
             else jmp.NoOpLossScale(),
             skip_infinite=self.config.skip_infinite,
         )
