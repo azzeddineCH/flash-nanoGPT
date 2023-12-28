@@ -50,24 +50,24 @@ class DataLoader:
             .repeat(
                 # repeat the dataset inf
             )
-            .unbatch()
-            .batch(
-                # un-batch the blocks to form a single sequence then
-                # batch it by block_size + 1 ( add one to consider the last prediction)
-                self.block_size + 1,
-                drop_remainder=True,
-            )
-            .shuffle(self.buffer_size)
-            .batch(
-                # batch the dataset to get the shape of (batch_size, block_size)
-                self.batch_size,
-                drop_remainder=True,
-            )
-            .shuffle(self.buffer_size)
-            .prefetch(
-                # prefetch the next N batches while training running on the accelerator
-                self.prefetch
-            )
+            # .unbatch()
+            # .batch(
+            #     # un-batch the blocks to form a single sequence then
+            #     # batch it by block_size + 1 ( add one to consider the last prediction)
+            #     self.block_size + 1,
+            #     drop_remainder=True,
+            # )
+            # .shuffle(self.buffer_size)
+            # .batch(
+            #     # batch the dataset to get the shape of (batch_size, block_size)
+            #     self.batch_size,
+            #     drop_remainder=True,
+            # )
+            # .shuffle(self.buffer_size)
+            # .prefetch(
+            #     # prefetch the next N batches while training running on the accelerator
+            #     self.prefetch
+            # )
         )
 
         return dataset
