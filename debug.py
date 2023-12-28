@@ -68,9 +68,9 @@ train_data_iter = DataLoader(
     num_workers=multiprocessing.cpu_count() // 2,
 ).get_iterator()
 
-print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
-print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
-print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
+# print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
+# print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
+# print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
 
 # validation_data_iter = DataLoader(
 #     directory=config.dataset_dir,
