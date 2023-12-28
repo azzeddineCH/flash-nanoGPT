@@ -9,9 +9,6 @@ from config import Config, get_default_config
 from ds.loader import DataLoader
 from training.trainer import Trainer
 
-# import multiprocessing
-
-
 if jax.process_index() == 0:
     print(
         f"TPU pod initialized, {jax.process_count()} host/s, {jax.local_device_count()} core per host, {jax.device_count()} total"
@@ -66,22 +63,8 @@ train_data_iter = DataLoader(
     num_shards=jax.process_count(),
     shard=jax.process_index(),
     num_workers=multiprocessing.cpu_count() // 2,
-)
+).get_iterator()
 
-# .get_iterator())
-
-# print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
-# print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
-# print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
-
-# validation_data_iter = DataLoader(
-#     directory=config.dataset_dir,
-#     batch_size=config.batch_size // jax.process_count(),
-#     block_size=config.block_size,
-#     split="val",
-#     prefetch=config.prefetch,
-#     buffer_size=config.buffer_size,
-#     num_shards=jax.process_count(),
-#     shard=jax.process_index(),
-#     num_workers=multiprocessing.cpu_count() // 4,
-# ).get_iterator()
+print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
+print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
+print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
