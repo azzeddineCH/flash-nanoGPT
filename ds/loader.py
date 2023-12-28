@@ -87,6 +87,6 @@ class DataLoader:
 
         def jax_iterator():
             for item in self.dataset:
-                yield make_batch(jnp.asarray(item))
+                yield make_batch(jnp.asarray(item, dtype=jnp.int32))
 
         return jax_iterator()
