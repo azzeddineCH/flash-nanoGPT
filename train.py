@@ -1,8 +1,10 @@
 import dataclasses
+import multiprocessing
 import time
 
 import jax
 import tyro
+from loader import DataLoader
 
 import wandb
 from config import Config, get_default_config
@@ -36,31 +38,29 @@ data_rng_key, training_key, key = jax.random.split(key, 3)
 if jax.process_index() == 0:
     print("Loading dataset ...")
 
-train_data_iter = None
-# DataLoader(
-#     directory=config.dataset_dir,
-#     batch_size=config.batch_size // jax.process_count(),
-#     block_size=config.block_size,
-#     split="train",
-#     prefetch=config.prefetch,
-#     buffer_size=config.buffer_size,
-#     num_shards=jax.process_count(),
-#     shard=jax.process_index(),
-#     num_workers=multiprocessing.cpu_count() // 2,
-# ).get_iterator()
+train_data_iter = DataLoader(
+    directory=config.dataset_dir,
+    batch_size=config.batch_size // jax.process_count(),
+    block_size=config.block_size,
+    split="train",
+    prefetch=config.prefetch,
+    buffer_size=config.buffer_size,
+    num_shards=jax.process_count(),
+    shard=jax.process_index(),
+    num_workers=multiprocessing.cpu_count() // 2,
+).get_iterator()
 
-validation_data_iter = None
-# DataLoader(
-#     directory=config.dataset_dir,
-#     batch_size=config.batch_size // jax.process_count(),
-#     block_size=config.block_size,
-#     split="val",
-#     prefetch=config.prefetch,
-#     buffer_size=config.buffer_size,
-#     num_shards=jax.process_count(),
-#     shard=jax.process_index(),
-#     num_workers=multiprocessing.cpu_count() // 2,
-# ).get_iterator()
+validation_data_iter = DataLoader(
+    directory=config.dataset_dir,
+    batch_size=config.batch_size // jax.process_count(),
+    block_size=config.block_size,
+    split="val",
+    prefetch=config.prefetch,
+    buffer_size=config.buffer_size,
+    num_shards=jax.process_count(),
+    shard=jax.process_index(),
+    num_workers=multiprocessing.cpu_count() // 4,
+).get_iterator()
 
 # ============= Init training state ============= #
 

@@ -1,11 +1,5 @@
 import time
-from typing import Iterator, Optional
-
-import jax
-import tensorflow as tf
-from jax import numpy as jnp
-
-from ds.utils import Batch, decode_tf_record_example
+from typing import Iterator
 
 
 class DataLoader:
@@ -17,7 +11,7 @@ class DataLoader:
         block_size: int,
         num_shards: int = 1,
         shard: int = 0,
-        num_workers: int = tf.data.AUTOTUNE,
+        num_workers: int = 2,
         buffer_size: int = 5,
         prefetch: int = 2,
     ):
@@ -32,9 +26,13 @@ class DataLoader:
         self.buffer_size = buffer_size
         self.prefetch = prefetch
 
-        self.dataset: Optional[tf.data.Dataset] = self._load()
+        self.dataset = self._load()
 
-    def _load(self) -> tf.data.Dataset:
+    def _load(self):
+        import tensorflow as tf
+
+        from ds.utils import decode_tf_record_example
+
         file_ds = tf.data.Dataset.list_files(
             f"{self.directory}/{self.split}*.tfrecord"
         ).shard(num_shards=self.num_shards, index=self.shard)
@@ -75,6 +73,11 @@ class DataLoader:
         return dataset
 
     def get_iterator(self) -> Iterator:
+        import jax
+        from jax import numpy as jnp
+
+        from ds.utils import Batch
+
         @jax.jit
         def make_batch(item):
             x, y = item[:, :-1], item[:, 1:]
@@ -89,6 +92,8 @@ class DataLoader:
 
 
 if __name__ == "__main__":
+    import jax
+
     rng_key = jax.random.PRNGKey(0)
     iterator = DataLoader(
         directory="../data/shakespeare",
