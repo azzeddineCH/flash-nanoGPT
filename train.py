@@ -34,6 +34,21 @@ if config.wandb and jax.process_index() == 0:
 key = jax.random.PRNGKey(0)
 data_rng_key, training_key, key = jax.random.split(key, 3)
 
+# ============= Init training state ============= #
+
+trainer = Trainer(config=config)
+
+start_iter = 0
+best_valid_loss = 1e6
+if config.restore == "scratch":
+    train_state = trainer.make_train_state()
+elif config.restore == "pre-trained":
+    train_state, best_valid_loss = trainer.restore()
+    start_iter = train_state.step + 1
+elif config.restore == "gpt-2":
+    train_state = trainer.restore_openai_gpt()
+    raise ValueError(f"unknown restore method {config.restore}")
+
 # ============= Init ds loaders ============= #
 if jax.process_index() == 0:
     print("Loading dataset ...")
@@ -61,21 +76,6 @@ validation_data_iter = DataLoader(
     shard=jax.process_index(),
     num_workers=multiprocessing.cpu_count() // 4,
 ).get_iterator()
-
-# ============= Init training state ============= #
-
-trainer = Trainer(config=config)
-
-start_iter = 0
-best_valid_loss = 1e6
-if config.restore == "scratch":
-    train_state = trainer.make_train_state()
-elif config.restore == "pre-trained":
-    train_state, best_valid_loss = trainer.restore()
-    start_iter = train_state.step + 1
-elif config.restore == "gpt-2":
-    train_state = trainer.restore_openai_gpt()
-    raise ValueError(f"unknown restore method {config.restore}")
 
 # ============= Training Loop ============= #
 
