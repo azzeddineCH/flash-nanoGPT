@@ -1,5 +1,4 @@
 import jax
-import tensorflow as tf
 from flax import struct
 
 
@@ -10,6 +9,8 @@ class Batch:
 
 
 def _bytes_feature(value):
+    import tensorflow as tf
+
     """Returns a bytes_list from a string / byte."""
     if isinstance(value, type(tf.constant(0))):
         value = value.numpy()  # BytesList won't unpack a string from an EagerTensor.
@@ -17,6 +18,8 @@ def _bytes_feature(value):
 
 
 def make_tf_record_example(example):
+    import tensorflow as tf
+
     example = tf.train.Example(
         features=tf.train.Features(
             feature=dict(tokens=_bytes_feature(example.tobytes()))
@@ -27,6 +30,8 @@ def make_tf_record_example(example):
 
 
 def decode_tf_record_example(record_bytes):
+    import tensorflow as tf
+
     example = tf.io.parse_single_example(
         # Data
         record_bytes,

@@ -1,4 +1,3 @@
-import time
 from typing import Iterator
 
 
@@ -89,24 +88,3 @@ class DataLoader:
                 yield make_batch(jnp.asarray(item))
 
         return jax_iterator()
-
-
-if __name__ == "__main__":
-    import jax
-
-    rng_key = jax.random.PRNGKey(0)
-    iterator = DataLoader(
-        directory="../data/shakespeare",
-        split="train",
-        batch_size=256,
-        block_size=1024,
-        num_shards=1,
-        shard=0,
-    ).get_iterator()
-
-    for i in range(10):
-        t0 = time.time()
-        x = next(iterator)
-        t1 = time.time() - t0
-
-        print(f"iter {i} | sampling time {t1}")
