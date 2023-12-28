@@ -36,7 +36,7 @@ class DataLoader:
             f"{self.directory}/{self.split}*.tfrecord"
         ).shard(num_shards=self.num_shards, index=self.shard)
 
-        print(file_ds, "<----")
+        print(file_ds, "<----", self.num_workers)
 
         dataset = (
             tf.data.TFRecordDataset(
