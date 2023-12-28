@@ -1,7 +1,7 @@
 tyro
 orbax-checkpoint
 tiktoken
-pip install jax[tpu] -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+jax[tpu] -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
 tensorflow
 flax
 optax
