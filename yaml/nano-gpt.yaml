@@ -2,7 +2,7 @@
 # checkpoint and eval
 eval_freq: 1000
 eval_num_steps: 200
-save_checkpoint: false
+save_checkpoint: true
 restore: "scratch"  # scratch | pre-trained | gpt
 checkpoint_dir: "checkpoints"
 log_freq: 10
@@ -12,8 +12,8 @@ wandb_run_id: "flash-nanoGPT-1"
 # data
 dataset_dir: "data/shakespeare"
 vocab_size: 50304
-grad_accum_steps: 40
-batch_size: 12
+grad_accum_steps: 1
+batch_size: 16
 block_size: 1024
 buffer_size: 5
 prefetch: 2
@@ -38,4 +38,4 @@ grad_clip: 1.0
 amp: true
 skip_infinite: true
 jit: true
-multi_host: false
+multi_host: true
