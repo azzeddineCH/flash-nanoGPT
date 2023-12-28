@@ -45,7 +45,6 @@ class Config:
     amp: bool
     skip_infinite: bool
     jit: bool
-    multi_host: bool
 
 
 def get_default_config():

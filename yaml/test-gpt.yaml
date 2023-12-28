@@ -38,4 +38,3 @@ grad_accum_steps: 1
 amp: false
 skip_infinite: true
 jit: false
-multi_host: false

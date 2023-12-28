@@ -38,4 +38,3 @@ grad_clip: 1.0
 amp: true
 skip_infinite: true
 jit: true
-multi_host: false
