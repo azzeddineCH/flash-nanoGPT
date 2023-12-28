@@ -1,5 +1,4 @@
 import os
-from dataclasses import asdict
 from pathlib import Path
 from typing import Tuple
 
@@ -15,7 +14,7 @@ from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.random import PRNGKeyArray
 
-from config import Config, get_default_config
+from config import Config
 from ds.utils import Batch
 from training.model import GPT, GPTConfig
 from training.state import TrainState
@@ -95,7 +94,6 @@ class Trainer:
             checkpointers=dict(
                 state=ocp.PyTreeCheckpointer(),
                 train_metrics=ocp.PyTreeCheckpointer(),
-                config=ocp.PyTreeCheckpointer(),
             ),
             options=ocp.CheckpointManagerOptions(
                 max_to_keep=3,
@@ -293,10 +291,9 @@ class Trainer:
     def validation_step(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> float:
-        # loss = self.validation_loss(rng_key, state, batch)
+        loss = self.validation_loss(rng_key, state, batch)
+        loss = jax.device_put(loss, self.host)
 
-        # loss = jax.device_put(loss, self.host)
-        loss = 0.0
         return loss
 
     def save(self, state: TrainState, metrics: TrainMetrics):
@@ -306,7 +303,6 @@ class Trainer:
             items=dict(
                 state=state,
                 train_metrics=metrics,
-                config=asdict(self.config),
             ),
             metrics=dict(loss=float(metrics.loss)),
         )
@@ -319,13 +315,11 @@ class Trainer:
             items=dict(
                 state=self.make_train_state(),
                 train_metrics=TrainMetrics(loss=0),
-                config=get_default_config(),
             ),
         )
 
         state = ckpt["state"]
         loss = ckpt["train_metrics"].loss
-        ckpt.pop("config")  # todo: handle different model config
 
         return state, loss
 
