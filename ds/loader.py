@@ -30,7 +30,7 @@ class DataLoader:
     def _load(self):
         import tensorflow as tf
 
-        from ds.utils import decode_tf_record_example
+        # from ds.utils import decode_tf_record_example
 
         file_ds = tf.data.Dataset.list_files(
             f"{self.directory}/{self.split}*.tfrecord"
@@ -42,14 +42,14 @@ class DataLoader:
                 filenames=file_ds,
                 num_parallel_reads=self.num_workers,
             )
-            .map(
-                # decode each of the tfrecords
-                decode_tf_record_example,
-                num_parallel_calls=self.num_workers,
-            )
-            .repeat(
-                # repeat the dataset inf
-            )
+            # .map(
+            #     # decode each of the tfrecords
+            #     decode_tf_record_example,
+            #     num_parallel_calls=self.num_workers,
+            # )
+            # .repeat(
+            #     # repeat the dataset inf
+            # )
             # .unbatch()
             # .batch(
             #     # un-batch the blocks to form a single sequence then
