@@ -66,7 +66,9 @@ train_data_iter = DataLoader(
     num_shards=jax.process_count(),
     shard=jax.process_index(),
     num_workers=multiprocessing.cpu_count() // 2,
-).get_iterator()
+)
+
+# .get_iterator())
 
 # print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
 # print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
