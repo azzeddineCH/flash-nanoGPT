@@ -11,14 +11,14 @@ from ds.loader import DataLoader
 from training.trainer import Trainer
 from training.utils import TrainMetrics
 
+if jax.process_index() == 0:
+    print(
+        f"TPU pod initialized, {jax.process_count()} host/s, {jax.local_device_count()} core per host, {jax.device_count()} total"
+    )
+
 # ============= Init configs ============= #
 
 config = tyro.cli(Config, default=get_default_config())
-
-if jax.process_index() == 0:
-    print(
-        f"TPU pod initialized, {jax.process_count()} host/s, {jax.local_device_count()} TPUs core per host"
-    )
 
 # ============= Init Logging ============= #
 
