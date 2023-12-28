@@ -85,7 +85,7 @@ class Trainer:
 
     def _make_device_mesh(self) -> shx.Mesh:
         devices = mesh_utils.create_device_mesh(
-            (len(jax.local_devices()),), devices=jax.local_devices()
+            mesh_shape=(jax.local_device_count(),), devices=jax.local_devices()
         )
         mesh = shx.Mesh(devices, axis_names=("data",))
         return mesh
@@ -223,9 +223,8 @@ class Trainer:
         grads = state.loss_scale.unscale(grads)
 
         if self.config.multi_host:
-            grads = jax.tree_util.tree_map(
-                lambda g: jnp.mean(g, axis=0), process_allgather(grads)
-            )
+            grads = jnp.array(process_allgather(grads), dtype=self.policy.param_dtype)
+            grads = jax.tree_util.tree_map(lambda g: jnp.mean(g, axis=0), grads)
 
         state = state.apply_gradients(
             grads=grads, skip_infinite=self.config.skip_infinite

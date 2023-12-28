@@ -13,7 +13,7 @@ wandb_run_id: "flash-nanoGPT"
 dataset_dir: "gs://flash-nano-gpt-bucket/data/openwebtext"
 vocab_size: 50304
 grad_accum_steps: 1
-batch_size: 16 # 16 * 32 = 512 ( on TPU v3-32 pod )
+batch_size: 512 # 16 * 32 = 512 ( on TPU v3-32 pod )
 block_size: 1024
 buffer_size: 5
 prefetch: 2

@@ -17,7 +17,7 @@ config = tyro.cli(Config, default=get_default_config())
 
 if jax.process_index() == 0:
     print(
-        f"TPU pod initialized, {jax.process_count()} host/s, {len(jax.local_devices())} TPUs core per host"
+        f"TPU pod initialized, {jax.process_count()} host/s, {jax.local_device_count()} TPUs core per host"
     )
 
 # ============= Init Logging ============= #
