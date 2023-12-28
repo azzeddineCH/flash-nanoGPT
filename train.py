@@ -15,12 +15,6 @@ from training.utils import TrainMetrics
 
 config = tyro.cli(Config, default=get_default_config())
 
-# ============= Init the cluster for multi-processing environment ============= #
-
-# this script is handling TPU pods, for GPU cluster check: https://jax.readthedocs.io/en/latest/multi_process.html
-if config.multi_host:
-    jax.distributed.initialize()
-
 if jax.process_index() == 0:
     print(
         f"TPU pod initialized, {jax.process_count()} host/s, {len(jax.local_devices())} TPUs core per host"
@@ -41,6 +35,8 @@ key = jax.random.PRNGKey(0)
 data_rng_key, training_key, key = jax.random.split(key, 3)
 
 # ============= Init ds loaders ============= #
+if jax.process_index() == 0:
+    print("Loading dataset ...")
 
 train_data_iter = DataLoader(
     directory=config.dataset_dir,
