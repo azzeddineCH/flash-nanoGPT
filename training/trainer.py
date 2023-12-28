@@ -28,16 +28,20 @@ class Trainer:
         # ============= Mixed Precision Policy ============= #
         self.on_tpu = jax.local_devices()[0].platform == "tpu"
 
-        self.policy = Policy(
-            param_dtype=jmp.half_dtype()
-            if (self.on_tpu and self.config.amp)
-            else jnp.float32,
-            compute_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
-            output_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
-            reduce_ops_dtype=jmp.half_dtype()
-            if (self.on_tpu and self.config.amp)
-            else jnp.float32,
-        )
+        if self.on_tpu:
+            self.policy = Policy(
+                param_dtype=jnp.bfloat16,
+                compute_dtype=jnp.bfloat16,
+                output_dtype=jnp.bfloat16,
+                reduce_ops_dtype=jnp.bfloat16,
+            )
+        else:
+            self.policy = Policy(
+                param_dtype=jnp.float32,
+                compute_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
+                output_dtype=jmp.half_dtype() if self.config.amp else jnp.float32,
+                reduce_ops_dtype=jnp.float32,
+            )
 
         # ============= Sharding Policy ============= #
         self.host = jax.devices("cpu")[0]
@@ -125,11 +129,7 @@ class Trainer:
 
         key = jax.random.PRNGKey(0)
         random_input = jax.random.randint(
-            key,
-            shape=(2, 8),
-            minval=0,
-            maxval=config.vocab_size,
-            dtype=jnp.int16 if self.config.amp else jnp.int32,
+            key, shape=(2, 8), minval=0, maxval=config.vocab_size, dtype=jnp.int32
         )
         model = GPT(config)
         state = model.init(key, x=random_input, train=False)
@@ -173,13 +173,15 @@ class Trainer:
 
         optimizer = self._make_optimizer(params)
 
+        scale = jmp.NoOpLossScale()
+        if self.config.amp and not self.on_tpu:
+            scale = jmp.DynamicLossScale(jnp.asarray(2.0**15, dtype=jnp.float32))
+
         state = TrainState.create(
             apply_fn=model.apply,
-            params=params,
+            params=self.policy.cast_to_param(params),
             tx=optimizer,
-            loss_scale=jmp.DynamicLossScale(jnp.asarray(2.0**15, dtype=jnp.float32))
-            if self.config.amp and not self.on_tpu
-            else jmp.NoOpLossScale(),
+            loss_scale=scale,
             skip_infinite=self.config.skip_infinite,
         )
 
