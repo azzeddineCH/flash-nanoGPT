@@ -39,4 +39,4 @@ def decode_tf_record_example(record_bytes):
         features={"tokens": tf.io.FixedLenFeature([], tf.string, default_value="")},
     )
 
-    return tf.io.decode_raw(input_bytes=example["tokens"], out_type=tf.int32)
+    return tf.io.decode_raw(input_bytes=example["tokens"], out_type=tf.uint16)
