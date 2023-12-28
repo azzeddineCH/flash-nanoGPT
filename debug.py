@@ -69,6 +69,8 @@ train_data_iter = DataLoader(
 ).get_iterator()
 
 print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
+print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
+print(next(train_data_iter).inputs.shape, "<-----", jax.process_index())
 
 # validation_data_iter = DataLoader(
 #     directory=config.dataset_dir,
