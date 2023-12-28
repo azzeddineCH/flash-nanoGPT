@@ -84,11 +84,11 @@ for i in range(start_iter, config.num_iters):
 
     t0 = time.time()
     train_batch_key, train_step_key, training_key = jax.random.split(training_key, 3)
+    print(i, "< starting step ---------")
     # train_state, train_metrics = trainer.training_step(
     #     train_step_key, train_state, batch=next(train_data_iter)
     # )
-    next(train_data_iter)
-    print(i)
+    print(i, "< finishing ---------")
     train_metrics = TrainMetrics(loss=0.0)
     step_time_s = time.time() - t0
 
