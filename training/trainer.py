@@ -12,6 +12,7 @@ from jax import numpy as jnp
 from jax import sharding as shx
 from jax import tree_util as trx
 from jax.experimental import mesh_utils
+from jax.experimental.multihost_utils import process_allgather
 from jax.random import PRNGKeyArray
 
 from config import Config, get_default_config
@@ -215,6 +216,11 @@ class Trainer:
         grads = self.policy.cast_to_param(grads)
         grads = state.loss_scale.unscale(grads)
 
+        if self.config.multi_host:
+            grads = jax.tree_util.tree_map(
+                lambda g: jnp.mean(g, axis=0), process_allgather(grads)
+            )
+
         state = state.apply_gradients(
             grads=grads, skip_infinite=self.config.skip_infinite
         )
@@ -256,21 +262,6 @@ class Trainer:
 
         # ============= sharding the batch ============= #
         batch = jax.device_put(batch, self.train_data_sharding)
-        if self.config.multi_host:
-            # =============  create a global batch array sharded across the mesh ============= #
-            batch = jax.tree_map(
-                lambda data: jax.make_array_from_single_device_arrays(
-                    shape=(
-                        self.config.batch_size * jax.process_count(),
-                        self.config.block_size,
-                    ),
-                    sharding=shx.NamedSharding(
-                        mesh=self.device_mesh, spec=shx.PartitionSpec(None, "data")
-                    ),
-                    arrays=[data],
-                ),
-                batch,
-            )
 
         # ============= running update loop on grad_accum dim ============= #
         state, metrics = self.update_loop(rng_key, state, batch)
@@ -282,6 +273,9 @@ class Trainer:
     ) -> float:
         batch = jax.device_put(batch, self.valid_data_sharding)
         loss_value = self.validation_loss(rng_key, state, batch)
+        if self.config.multi_host:
+            loss_value = jnp.mean(process_allgather(loss_value))
+
         loss_value = jax.device_put(loss_value, self.host)
 
         return loss_value
