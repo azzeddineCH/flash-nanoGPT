@@ -44,12 +44,12 @@ class Trainer:
         self.device_mesh = self._make_device_mesh()
 
         self.train_data_sharding = shx.NamedSharding(
-            self.device_mesh.local_mesh,
+            self.device_mesh,
             spec=shx.PartitionSpec(None, "data"),  # accumulation, batch, ...
         )
 
         self.valid_data_sharding = shx.NamedSharding(
-            self.device_mesh.local_mesh,
+            self.device_mesh,
             spec=shx.PartitionSpec("data"),  # batch, ...
         )
 
@@ -84,7 +84,7 @@ class Trainer:
         )
 
     def _make_device_mesh(self) -> shx.Mesh:
-        devices = mesh_utils.create_device_mesh((len(jax.devices()),))
+        devices = mesh_utils.create_device_mesh((len(jax.local_devices()),))
         mesh = shx.Mesh(devices, axis_names=("data",))
         return mesh
 
