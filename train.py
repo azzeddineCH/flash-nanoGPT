@@ -4,10 +4,10 @@ import time
 
 import jax
 import tyro
-from loader import DataLoader
 
 import wandb
 from config import Config, get_default_config
+from ds.loader import DataLoader
 from training.trainer import Trainer
 from training.utils import TrainMetrics
 
