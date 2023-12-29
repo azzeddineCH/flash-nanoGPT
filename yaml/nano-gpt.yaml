@@ -8,7 +8,7 @@ checkpoint_dir: "checkpoints"
 log_freq: 10
 wandb: true
 wandb_project_name: "flash-nano-gpt"
-wandb_run_id: "flash-nanoGPT"
+wandb_run_id: "nano-gpt"
 # data
 dataset_dir: "gs://flash-nano-gpt-bucket/data/openwebtext"
 vocab_size: 50304

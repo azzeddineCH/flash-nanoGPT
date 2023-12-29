@@ -29,6 +29,10 @@ class Trainer:
         self.on_tpu = jax.local_devices()[0].platform == "tpu"
 
         if self.on_tpu:
+            # when training on TPUs with bflaot16 there is no need for mixed precision
+            # as each multiply-accumulate operation in a matrix multiplication
+            # uses bfloat16 for the multiplication and 32-bit IEEE floating point for accumulation.
+            # check: https://cloud.google.com/blog/products/ai-machine-learning/bfloat16-the-secret-to-high-performance-on-cloud-tpus
             self.policy = Policy(
                 param_dtype=jmp.half_dtype(),
                 compute_dtype=jmp.half_dtype(),
@@ -138,6 +142,7 @@ class Trainer:
         return model, state["params"]
 
     def _make_optimizer(self, params: PyTreeNode) -> optax.MultiSteps:
+        # ============= learning rate schedular ============= #
         schedule = optax.warmup_cosine_decay_schedule(
             init_value=0.0,
             peak_value=self.config.lr,
@@ -146,7 +151,7 @@ class Trainer:
             end_value=self.config.lr_min,
         )
 
-        # we use "optax.inject_hyperparams" in order to track the learning rate
+        # ============= use "inject_hyperparams" in order to track the learning rate ============= #
         optimizer = optax.inject_hyperparams(optax.adamw)(
             learning_rate=schedule,
             b1=self.config.beta1,
@@ -155,11 +160,13 @@ class Trainer:
             mask=trx.tree_map(lambda p: p.ndim >= 2, params),
         )
 
+        # ============= gradient global norm clipping ============= #
         optimizer = optax.chain(
             optax.clip_by_global_norm(self.config.grad_clip),
             optimizer,
         )
 
+        # ============= gradient accumulation ============= #
         optimizer = optax.MultiSteps(
             optimizer, every_k_schedule=self.config.grad_accum_steps
         )
@@ -227,28 +234,33 @@ class Trainer:
         scaled_loss = state.loss_scale.scale(loss)
         return scaled_loss, loss
 
-    def _validation_loss(self, _rng_key, _state, _batch):
-        params = self.policy.cast_to_compute(_state.params)
-        loss = self._loss(_rng_key, params, _state, _batch, train=False)
+    def _validation_loss(
+        self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
+    ) -> jax.Array:
+        params = self.policy.cast_to_compute(state.params)
+        loss = self._loss(rng_key, params, state, batch, train=False)
         return jax.lax.pmean(loss, axis_name="data")
 
     def _update(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> Tuple[TrainState, TrainMetrics]:
+        # ============= cast params to half precision for forward and back propagation ============= #
         params = self.policy.cast_to_compute(state.params)
-
         (_, loss), grads = jax.value_and_grad(self._loss, argnums=1, has_aux=True)(
             rng_key, params, state, batch
         )
 
+        # =============  cast the grads to full precision for updating the weights ============= #
         grads = self.policy.cast_to_param(grads)
         grads = state.loss_scale.unscale(grads)
 
+        # ============= average grads and loss across replicas ============= #
         grads = jax.tree_util.tree_map(
             lambda g: jax.lax.pmean(g, axis_name="data"), grads
         )
         loss = jax.lax.pmean(loss, axis_name="data")
 
+        # ============= apply the gradients and skip the update if inf grads are found ============= #
         state = state.apply_gradients(
             grads=grads, skip_infinite=self.config.skip_infinite
         )
@@ -261,9 +273,10 @@ class Trainer:
 
         return state, metrics
 
-    def _update_loop(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch):
+    def _update_loop(
+        self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
+    ) -> Tuple[TrainState, TrainMetrics]:
         rng_keys = jax.random.split(rng_key, self.config.grad_accum_steps)
-
         state, metrics = jax.lax.scan(
             f=lambda state, xs: self._update(
                 rng_key=xs[0],
@@ -298,7 +311,7 @@ class Trainer:
 
     def validation_step(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
-    ) -> float:
+    ) -> jax.Array:
         loss = self.validation_loss(rng_key, state, batch)
         loss = jax.device_put(loss, self.host)
         return loss
