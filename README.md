@@ -14,9 +14,9 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] Loading and Saving checkpoints
 - [x] Reproduce the results on shakespear-char dataset
 - [x] TF Record reader/write with support for GCP bucket
-- [ ] Loading GPTs pre-trained models
-- [ ] Multi-host training
+- [x] Multi-host training
 - [ ] Reproducing results on OpenWebText dataset
+- [ ] Loading GPTs pre-trained models
 - [ ] Fine tuning GPT-2 weights on Shakespear dataset
 - [ ] Profiling/Benchmarking and speeding up iteration
 - [ ] Flash attention with Pallas

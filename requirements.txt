@@ -1,11 +1,11 @@
 tyro
 orbax-checkpoint
 tiktoken
-tensorflow
+tensorflow-macos
 flax
 optax
 git+https://github.com/deepmind/jmp
-jax[tpu] -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+jax
 wandb
 datasets
 ruff
