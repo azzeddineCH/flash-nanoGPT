@@ -1,4 +1,5 @@
 import dataclasses
+import logging
 
 import jax
 import tyro
@@ -61,4 +62,4 @@ for i in range(0, config.num_iters):
 
     if config.wandb and jax.process_index() == 0:
         wandb.log({"iter": i})
-        print("---> ", i)
+        logging.info("---> ", i)
