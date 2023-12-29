@@ -276,15 +276,23 @@ class Trainer:
     def _update_loop(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch):
         rng_keys = jax.random.split(rng_key, self.config.grad_accum_steps)
         print("------8")
-        state, metrics = jax.lax.scan(
-            f=lambda state, xs: self._update(
-                rng_key=xs[0],
-                batch=xs[1],
+        for i in range(self.config.grad_accum_steps):
+            state, metrics = self._update(
+                rng_key=rng_keys[i],
+                batch=Batch(inputs=batch.inputs[i], labels=batch.labels[i]),
                 state=state,
-            ),
-            init=state,
-            xs=(rng_keys, batch),
-        )
+            )
+
+        # state, metrics = jax.lax.scan(
+        #     f=lambda state, xs: self._update(
+        #         rng_key=xs[0],
+        #         batch=xs[1],
+        #         state=state,
+        #     ),
+        #     init=state,
+        #     xs=(rng_keys, batch),
+        # )
+
         metrics = trx.tree_map(lambda m: jnp.mean(m), metrics)
         return state, metrics
 
