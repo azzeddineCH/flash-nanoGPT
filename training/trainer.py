@@ -125,6 +125,7 @@ class Trainer:
             dropout_rate=self.config.dropout_rate,
             use_bias=self.config.use_bias,
             reduce_ops_dtype=self.policy.reduce_ops_dtype,
+            params_dtype=jmp.half_dtype() if self.on_tpu else None,
         )
 
         key = jax.random.PRNGKey(0)
@@ -241,6 +242,7 @@ class Trainer:
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> Tuple[TrainState, TrainMetrics]:
         print("-----> here ??")
+
         params = self.policy.cast_to_compute(state.params)
 
         print("------4")
