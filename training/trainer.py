@@ -30,10 +30,10 @@ class Trainer:
 
         if self.on_tpu:
             self.policy = Policy(
-                param_dtype=jnp.bfloat16,
-                compute_dtype=jnp.bfloat16,
-                output_dtype=jnp.bfloat16,
-                reduce_ops_dtype=jnp.bfloat16,
+                param_dtype=jmp.half_dtype(),
+                compute_dtype=jmp.half_dtype(),
+                output_dtype=jmp.half_dtype(),
+                reduce_ops_dtype=jmp.half_dtype(),
             )
         else:
             self.policy = Policy(
@@ -125,6 +125,7 @@ class Trainer:
             dropout_rate=self.config.dropout_rate,
             use_bias=self.config.use_bias,
             reduce_ops_dtype=self.policy.reduce_ops_dtype,
+            param_dtype=self.policy.param_dtype,
         )
 
         key = jax.random.PRNGKey(0)
@@ -179,7 +180,7 @@ class Trainer:
 
         state = TrainState.create(
             apply_fn=model.apply,
-            params=self.policy.cast_to_param(params),
+            params=params,
             tx=optimizer,
             loss_scale=scale,
             skip_infinite=self.config.skip_infinite,
@@ -278,7 +279,6 @@ class Trainer:
     def training_step(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> Tuple[TrainState, TrainMetrics]:
-        print("starting step -----------> ")
         # ============= adding grad accumulation dim ============= #
         batch = trx.tree_map(
             lambda x: x.reshape(
