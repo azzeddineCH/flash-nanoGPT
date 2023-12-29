@@ -305,14 +305,17 @@ class Trainer:
         state, metrics = self.update_loop(rng_key, state, batch)
         metrics = jax.device_put(metrics, self.host)
 
+        print("------9")
+
         return state, metrics
 
     def validation_step(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> float:
+        print("------ 10")
         loss = self.validation_loss(rng_key, state, batch)
         loss = jax.device_put(loss, self.host)
-
+        print("------11")
         return loss
 
     def save(self, state: TrainState, metrics: TrainMetrics):
