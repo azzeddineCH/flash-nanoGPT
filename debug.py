@@ -58,4 +58,6 @@ for i in range(0, config.num_iters):
     # ============= Training ============= #
 
     train_batch = next(train_data_iter)
-    wandb.log({"iter": i})
+
+    if config.wandb and jax.process_index() == 0:
+        wandb.log({"iter": i})
