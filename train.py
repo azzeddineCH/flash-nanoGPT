@@ -1,4 +1,6 @@
 import dataclasses
+import logging
+import sys
 import time
 
 import jax
@@ -10,6 +12,8 @@ from ds.loader import DataLoader
 from training.trainer import Trainer
 from training.utils import TrainMetrics
 
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
 
 def log(tree):
     host = jax.devices("cpu")[0]
@@ -17,7 +21,7 @@ def log(tree):
 
 
 if jax.process_index() == 0:
-    print(
+    logging.info(
         f"TPU pod initialized, {jax.process_count()} host/s, {jax.local_device_count()} core per host, {jax.device_count()} total"
     )
 
@@ -46,6 +50,10 @@ trainer = Trainer(config=config)
 
 start_iter = 0
 best_valid_loss = 1e6
+
+if jax.process_index() == 0:
+    logging.info("Creating Train state ...")
+
 if config.restore == "scratch":
     train_state = trainer.make_train_state(state_key)
 elif config.restore == "pre-trained":
@@ -55,9 +63,12 @@ elif config.restore == "gpt-2":
     train_state = trainer.restore_openai_gpt()
     raise ValueError(f"unknown restore method {config.restore}")
 
+if jax.process_index() == 0:
+    logging.info(f"Train state created | model parameters : {train_state.num_params}")
+
 # ============= Init ds loaders ============= #
 if jax.process_index() == 0:
-    print("Loading dataset ...")
+    logging.info("Loading dataset ...")
 
 train_data_iter = DataLoader(
     directory=config.dataset_dir,
@@ -113,7 +124,7 @@ for i in range(start_iter, config.num_iters):
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
             if jax.process_index() == 0:
-                print(
+                logging.info(
                     f"iter: {train_state.step} |  val loss {valid_loss} | train loss {train_loss}"
                 )
                 if config.save_checkpoint:
@@ -138,7 +149,7 @@ for i in range(start_iter, config.num_iters):
     # ============= Logging ============= #
 
     if train_state.step % config.log_freq == 0 and jax.process_index() == 0:
-        print(
+        logging.info(
             f"iter: {train_state.step} | loss: {train_metrics.loss} | time_ms: {step_time_s * 1000}"
         )
 

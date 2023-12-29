@@ -175,9 +175,6 @@ class Trainer:
         return optimizer
 
     def make_train_state(self, state_key: PRNGKeyArray) -> TrainState:
-        if jax.process_index() == 0:
-            print("Creating Train state ...")
-
         model, params = self._make_model(state_key)
 
         optimizer = self._make_optimizer(params)
@@ -193,9 +190,6 @@ class Trainer:
             loss_scale=scale,
             skip_infinite=self.config.skip_infinite,
         )
-
-        if jax.process_index() == 0:
-            print(f"Train state created | model parameters : {state.num_params}")
 
         return state
 
