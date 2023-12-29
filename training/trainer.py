@@ -278,6 +278,7 @@ class Trainer:
     def training_step(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> Tuple[TrainState, TrainMetrics]:
+        print("starting step -----------> ")
         # ============= adding grad accumulation dim ============= #
         batch = trx.tree_map(
             lambda x: x.reshape(
