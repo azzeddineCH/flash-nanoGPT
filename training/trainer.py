@@ -217,10 +217,9 @@ class Trainer:
         )
 
         loss = optax.softmax_cross_entropy_with_integer_labels(
-            logits=self.policy.cast_to_reduce_ops(logits), labels=batch.labels
+            logits=logits, labels=batch.labels
         ).mean()
 
-        loss = self.policy.cast_to_output(loss)
         if not train:
             return loss
 
@@ -228,25 +227,24 @@ class Trainer:
         return scaled_loss, loss
 
     def _validation_loss(self, _rng_key, _state, _batch):
-        params = self.policy.cast_to_compute(_state.params)
-        loss = self._loss(_rng_key, params, _state, _batch, train=False)
+        loss = self._loss(_rng_key, _state.params, _state, _batch, train=False)
         return jax.lax.pmean(loss, axis_name="data")
 
     def _update(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> Tuple[TrainState, TrainMetrics]:
-        params = self.policy.cast_to_compute(state.params)
+        params = state.params
 
         (_, loss), grads = jax.value_and_grad(self._loss, argnums=1, has_aux=True)(
             rng_key, params, state, batch
         )
 
-        grads = self.policy.cast_to_param(grads)
         grads = state.loss_scale.unscale(grads)
 
         grads = jax.tree_util.tree_map(
             lambda g: jax.lax.pmean(g, axis_name="data"), grads
         )
+        loss = jax.lax.pmean(loss, axis_name="data")
 
         state = state.apply_gradients(
             grads=grads, skip_infinite=self.config.skip_infinite

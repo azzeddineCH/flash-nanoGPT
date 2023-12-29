@@ -36,15 +36,9 @@ class CasualAttention(nn.Module):
     def __call__(self, x, *, train=True):
         batch, seq_length, embd_dim = x.shape
 
-        q = HiddenDense(embd_dim, use_bias=self.use_bias, param_dtype=self.param_dtype)(
-            x
-        )
-        k = HiddenDense(embd_dim, use_bias=self.use_bias, param_dtype=self.param_dtype)(
-            x
-        )
-        v = HiddenDense(embd_dim, use_bias=self.use_bias, param_dtype=self.param_dtype)(
-            x
-        )
+        q = HiddenDense(embd_dim, use_bias=self.use_bias, dtype=self.param_dtype)(x)
+        k = HiddenDense(embd_dim, use_bias=self.use_bias, dtype=self.param_dtype)(x)
+        v = HiddenDense(embd_dim, use_bias=self.use_bias, dtype=self.param_dtype)(x)
 
         q = q.reshape(
             batch, seq_length, self.num_heads, embd_dim // self.num_heads
@@ -57,7 +51,11 @@ class CasualAttention(nn.Module):
         ).transpose([0, 2, 1, 3])
 
         # batch, num_head, seq_length, seq_length
-        dot_product = q @ k.transpose([0, 1, 3, 2]) * (1.0 / jnp.sqrt(k.shape[-1]))
+        dot_product = (
+            q
+            @ k.transpose([0, 1, 3, 2])
+            * (1.0 / jnp.sqrt(k.shape[-1]).astype(self.param_dtype))
+        )
 
         # batch, num_head, seq_length, seq_length
         casual_mask = nn.make_causal_mask(
@@ -67,8 +65,7 @@ class CasualAttention(nn.Module):
             casual_mask, dot_product, jnp.finfo(dot_product.dtype).min
         )
 
-        attn_scores = jax.nn.softmax(masked_dot_product.astype(self.reduce_ops_dtype))
-        attn_scores = attn_scores.astype(masked_dot_product.dtype)
+        attn_scores = jax.nn.softmax(masked_dot_product).astype(self.param_dtype)
 
         attn_scores = nn.Dropout(self.dropout_rate)(
             attn_scores, deterministic=not train
@@ -84,7 +81,7 @@ class CasualAttention(nn.Module):
 
         proj_dense = make_dense(kernel_init_std=0.02 / self.proj_kernel_init_norm)
         post_projection_attn_embeddings = proj_dense(
-            embd_dim, use_bias=self.use_bias, param_dtype=self.param_dtype
+            embd_dim, use_bias=self.use_bias, dtype=self.param_dtype
         )(attn_embeddings)
 
         # batch, seq_length, embd_dim
@@ -108,13 +105,13 @@ class MLP(nn.Module):
         x = HiddenDense(
             self.input_factor * embd_dim,
             use_bias=self.use_bias,
-            param_dtype=self.param_dtype,
+            dtype=self.param_dtype,
         )(x)
 
         x = nn.activation.gelu(x)
 
         x = make_dense(kernel_init_std=0.02 / self.proj_kernel_init_norm)(
-            embd_dim, use_bias=self.use_bias, param_dtype=self.param_dtype
+            embd_dim, use_bias=self.use_bias, dtype=self.param_dtype
         )(x)
 
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
@@ -130,7 +127,7 @@ class AttentionBlock(nn.Module):
 
     def setup(self):
         self.l1 = LayerNorm(
-            use_bias=self.use_bias, param_dtype=self.param_dtype, use_scale=True
+            use_bias=self.use_bias, dtype=self.param_dtype, use_scale=True
         )
         self.attention = CasualAttention(
             use_bias=self.use_bias,
@@ -139,7 +136,7 @@ class AttentionBlock(nn.Module):
             param_dtype=self.param_dtype,
         )
         self.l2 = LayerNorm(
-            use_bias=self.use_bias, use_scale=True, param_dtype=self.param_dtype
+            use_bias=self.use_bias, use_scale=True, dtype=self.param_dtype
         )
         self.mlp = MLP(
             use_bias=self.use_bias,
@@ -148,16 +145,9 @@ class AttentionBlock(nn.Module):
         )
 
     def __call__(self, x, train=True):
-        x_l1 = x.astype(self.reduce_ops_dtype)
-        x_l1 = self.l1(x_l1)
-        x = x_l1.astype(x.dtype)
-
+        x = self.l1(x)
         x = self.attention(x, train=train) + x
-
-        x_l2 = x.astype(self.reduce_ops_dtype)
-        x_l2 = self.l2(x_l2)
-        x = x_l2.astype(x.dtype)
-
+        x = self.l2(x)
         x = self.mlp(x, train=train) + x
 
         return x
@@ -184,13 +174,13 @@ class GPT(nn.Module):
             num_embeddings=self.config.vocab_size,
             features=self.config.embd_dim,
             embedding_init=normal_initializer(std=0.02),
-            param_dtype=self.config.param_dtype,
+            dtype=self.config.param_dtype,
         )
         self.positional_embeddings = nn.Embed(
             num_embeddings=self.config.block_size,
             features=self.config.embd_dim,
             embedding_init=normal_initializer(std=0.02),
-            param_dtype=self.config.param_dtype,
+            dtype=self.config.param_dtype,
         )
 
         self.dropout = nn.Dropout(self.config.dropout_rate)
@@ -208,7 +198,7 @@ class GPT(nn.Module):
         self.layer_norm = LayerNorm(
             use_bias=self.config.use_bias,
             use_scale=True,
-            param_dtype=self.config.param_dtype,
+            dtype=self.config.param_dtype,
         )
 
     def __call__(self, x, *, train=True, top_k=None):
@@ -226,9 +216,7 @@ class GPT(nn.Module):
         if top_k:
             embeddings = embeddings[:, -top_k:, :]
 
-        embeddings = embeddings.astype(self.config.reduce_ops_dtype)
         embeddings = self.layer_norm(embeddings)
-        embeddings = embeddings.astype(positions_embeddings.dtype)
 
         logits = self.token_embeddings.attend(embeddings)
 
