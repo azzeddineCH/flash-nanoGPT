@@ -41,11 +41,11 @@ training_key = jax.random.fold_in(training_key, jax.process_index())
 if jax.process_index() == 0:
     print("Loading dataset ...")
 
-train_data_iter = DataLoader(
+validation_data_iter = DataLoader(
     directory=config.dataset_dir,
     batch_size=config.batch_size // jax.process_count(),
     block_size=config.block_size,
-    split="train",
+    split="val",
     prefetch=config.prefetch,
     buffer_size=config.buffer_size,
     num_shards=jax.process_count(),
@@ -57,7 +57,8 @@ train_data_iter = DataLoader(
 for i in range(0, config.num_iters):
     # ============= Training ============= #
 
-    train_batch = next(train_data_iter)
+    train_batch = next(validation_data_iter)
 
     if config.wandb and jax.process_index() == 0:
         wandb.log({"iter": i})
+        print("---> ", i)
