@@ -12,6 +12,7 @@ wandb_run_id: "test-gpt"
 # data
 dataset_dir: "data/shakespeare"
 vocab_size: 50304
+grad_accum_steps: 1
 batch_size: 32
 block_size: 32
 buffer_size: 5
@@ -34,7 +35,7 @@ beta1: 0.9
 beta2: 0.95
 grad_clip: 1.0
 # training
-grad_accum_steps: 1
+seed: 0
 amp: false
 skip_infinite: true
 jit: false

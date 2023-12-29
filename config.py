@@ -45,6 +45,7 @@ class Config:
     amp: bool
     skip_infinite: bool
     jit: bool
+    seed: int
 
 
 def get_default_config():
