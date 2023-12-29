@@ -240,6 +240,7 @@ class Trainer:
     def _update(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> Tuple[TrainState, TrainMetrics]:
+        print("-----> here ??")
         params = self.policy.cast_to_compute(state.params)
 
         print("------4")
