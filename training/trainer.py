@@ -28,7 +28,7 @@ class Trainer:
         # ============= Mixed Precision Policy ============= #
         self.on_tpu = jax.local_devices()[0].platform == "tpu"
 
-        if self.on_tpu:
+        if self.config.amp and self.on_tpu:
             # when training on TPUs with bflaot16 there is no need for mixed precision
             # as each multiply-accumulate operation in a matrix multiplication
             # uses bfloat16 for the multiplication and 32-bit IEEE floating point for accumulation.
