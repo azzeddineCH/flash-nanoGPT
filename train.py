@@ -110,28 +110,28 @@ for i in range(start_iter, config.num_iters):
                 / config.eval_num_steps
             )
 
-    if valid_loss < best_valid_loss:
-        best_valid_loss = valid_loss
-        if jax.process_index() == 0:
-            print(
-                f"iter: {train_state.step} |  val loss {valid_loss} | train loss {train_loss}"
-            )
-            if config.save_checkpoint:
-                trainer.save(train_state, metrics=TrainMetrics(loss=valid_loss))
+        if valid_loss < best_valid_loss:
+            best_valid_loss = valid_loss
+            if jax.process_index() == 0:
+                print(
+                    f"iter: {train_state.step} |  val loss {valid_loss} | train loss {train_loss}"
+                )
+                if config.save_checkpoint:
+                    trainer.save(train_state, metrics=TrainMetrics(loss=valid_loss))
 
-    if config.wandb and jax.process_index() == 0:
-        log(
-            {
-                "iter": train_state.step,
-                "train/loss": train_loss,
-                "val/loss": valid_loss,
-                "lr": train_state.lr,
-                "loss_scale": train_state.loss_scale.loss_scale,
-                "grads_gnorm": train_metrics.grads_gnorm,
-                "params_gnorm": train_metrics.params_gnorm,
-                "time_ms": step_time_s * 1000,
-            }
-        )
+        if config.wandb and jax.process_index() == 0:
+            log(
+                {
+                    "iter": train_state.step,
+                    "train/loss": train_loss,
+                    "val/loss": valid_loss,
+                    "lr": train_state.lr,
+                    "loss_scale": train_state.loss_scale.loss_scale,
+                    "grads_gnorm": train_metrics.grads_gnorm,
+                    "params_gnorm": train_metrics.params_gnorm,
+                    "time_ms": step_time_s * 1000,
+                }
+            )
     # ============= Logging ============= #
 
     if train_state.step % config.log_freq == 0 and jax.process_index() == 0:
