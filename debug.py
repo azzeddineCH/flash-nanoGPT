@@ -62,4 +62,4 @@ for i in range(0, config.num_iters):
 
     if config.wandb and jax.process_index() == 0:
         wandb.log({"iter": i})
-        logging.info("---> ", i)
+    logging.info(f"---> {jax.process_index()} - {i} ")
