@@ -28,7 +28,7 @@ config = tyro.cli(Config, default=get_default_config())
 
 # ============= Init Logging ============= #
 
-if config.wandb and jax.process_index() == 0:
+if config.wandb:
     wandb.init(
         project=config.wandb_project_name,
         name=config.wandb_run_id,
@@ -63,6 +63,5 @@ for i in range(0, config.num_iters):
 
     train_batch = next(validation_data_iter)
 
-    if config.wandb and jax.process_index() == 0:
-        wandb.log({"iter": i})
+    wandb.log({f"iter-{jax.process_index()}": i})
     logging.info(f"---> {jax.process_index()} - {i} ")
