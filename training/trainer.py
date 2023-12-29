@@ -125,7 +125,6 @@ class Trainer:
             dropout_rate=self.config.dropout_rate,
             use_bias=self.config.use_bias,
             reduce_ops_dtype=self.policy.reduce_ops_dtype,
-            params_dtype=jmp.half_dtype() if self.on_tpu else None,
         )
 
         key = jax.random.PRNGKey(0)
@@ -216,21 +215,15 @@ class Trainer:
             rngs={"dropout": rng_key},
         )
 
-        print("------1")
-
         loss = optax.softmax_cross_entropy_with_integer_labels(
             logits=self.policy.cast_to_reduce_ops(logits), labels=batch.labels
         ).mean()
-
-        print("------2")
 
         loss = self.policy.cast_to_output(loss)
         if not train:
             return loss
 
         scaled_loss = state.loss_scale.scale(loss)
-
-        print("------3")
         return scaled_loss, loss
 
     def _validation_loss(self, _rng_key, _state, _batch):
@@ -241,17 +234,11 @@ class Trainer:
     def _update(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> Tuple[TrainState, TrainMetrics]:
-        print("-----> here ??")
-
         params = self.policy.cast_to_compute(state.params)
-
-        print("------4")
 
         (_, loss), grads = jax.value_and_grad(self._loss, argnums=1, has_aux=True)(
             rng_key, params, state, batch
         )
-
-        print("------5")
 
         grads = self.policy.cast_to_param(grads)
         grads = state.loss_scale.unscale(grads)
@@ -260,13 +247,9 @@ class Trainer:
             lambda g: jax.lax.pmean(g, axis_name="data"), grads
         )
 
-        print("------6")
-
         state = state.apply_gradients(
             grads=grads, skip_infinite=self.config.skip_infinite
         )
-
-        print("------7")
 
         metrics = TrainMetrics(
             loss=loss,
@@ -278,23 +261,16 @@ class Trainer:
 
     def _update_loop(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch):
         rng_keys = jax.random.split(rng_key, self.config.grad_accum_steps)
-        print("------8")
-        for i in range(self.config.grad_accum_steps):
-            state, metrics = self._update(
-                rng_key=rng_keys[i],
-                batch=Batch(inputs=batch.inputs[i], labels=batch.labels[i]),
-                state=state,
-            )
 
-        # state, metrics = jax.lax.scan(
-        #     f=lambda state, xs: self._update(
-        #         rng_key=xs[0],
-        #         batch=xs[1],
-        #         state=state,
-        #     ),
-        #     init=state,
-        #     xs=(rng_keys, batch),
-        # )
+        state, metrics = jax.lax.scan(
+            f=lambda state, xs: self._update(
+                rng_key=xs[0],
+                batch=xs[1],
+                state=state,
+            ),
+            init=state,
+            xs=(rng_keys, batch),
+        )
 
         metrics = trx.tree_map(lambda m: jnp.mean(m), metrics)
         return state, metrics
@@ -316,17 +292,13 @@ class Trainer:
         state, metrics = self.update_loop(rng_key, state, batch)
         metrics = jax.device_put(metrics, self.host)
 
-        print("------9")
-
         return state, metrics
 
     def validation_step(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> float:
-        print("------ 10")
         loss = self.validation_loss(rng_key, state, batch)
         loss = jax.device_put(loss, self.host)
-        print("------11")
         return loss
 
     def save(self, state: TrainState, metrics: TrainMetrics):

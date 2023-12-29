@@ -30,15 +30,14 @@ class CasualAttention(nn.Module):
     use_bias: bool = True
     proj_kernel_init_norm: float = 1.0
     reduce_ops_dtype: jnp.dtype = jnp.float32
-    params_dtype: jnp.dtype = None
 
     @nn.compact
     def __call__(self, x, *, train=True):
         batch, seq_length, embd_dim = x.shape
 
-        q = HiddenDense(embd_dim, use_bias=self.use_bias, dtype=self.params_dtype)(x)
-        k = HiddenDense(embd_dim, use_bias=self.use_bias, dtype=self.params_dtype)(x)
-        v = HiddenDense(embd_dim, use_bias=self.use_bias, dtype=self.params_dtype)(x)
+        q = HiddenDense(embd_dim, use_bias=self.use_bias)(x)
+        k = HiddenDense(embd_dim, use_bias=self.use_bias)(x)
+        v = HiddenDense(embd_dim, use_bias=self.use_bias)(x)
 
         q = q.reshape(
             batch, seq_length, self.num_heads, embd_dim // self.num_heads
@@ -57,7 +56,6 @@ class CasualAttention(nn.Module):
         casual_mask = nn.make_causal_mask(
             x=jnp.ones((batch, self.num_heads, seq_length))
         ).squeeze()
-
         masked_dot_product = jnp.where(
             casual_mask, dot_product, jnp.finfo(dot_product.dtype).min
         )
@@ -65,7 +63,6 @@ class CasualAttention(nn.Module):
         # force masked_dot_product dtype to full precision when running on GPU
         attn_scores = jax.nn.softmax(masked_dot_product.astype(self.reduce_ops_dtype))
         attn_scores = attn_scores.astype(masked_dot_product.dtype)
-
         attn_scores = nn.Dropout(self.dropout_rate)(
             attn_scores, deterministic=not train
         )
@@ -81,9 +78,9 @@ class CasualAttention(nn.Module):
         # batch, seq_length, embd_dim
 
         proj_dense = make_dense(kernel_init_std=0.02 / self.proj_kernel_init_norm)
-        post_projection_attn_embeddings = proj_dense(
-            embd_dim, use_bias=self.use_bias, dtype=self.params_dtype
-        )(attn_embeddings)
+        post_projection_attn_embeddings = proj_dense(embd_dim, use_bias=self.use_bias)(
+            attn_embeddings
+        )
 
         # batch, seq_length, embd_dim
         attn = nn.Dropout(self.dropout_rate)(
@@ -98,7 +95,6 @@ class MLP(nn.Module):
     dropout_rate: float = 0.2
     use_bias: bool = True
     proj_kernel_init_norm: int = 1
-    params_dtype: jnp.dtype = None
 
     @nn.compact
     def __call__(self, x, train=True):
@@ -106,13 +102,13 @@ class MLP(nn.Module):
         x = HiddenDense(
             self.input_factor * embd_dim,
             use_bias=self.use_bias,
-            dtype=self.params_dtype,
         )(x)
 
         x = nn.activation.gelu(x)
 
         x = make_dense(kernel_init_std=0.02 / self.proj_kernel_init_norm)(
-            embd_dim, use_bias=self.use_bias, dtype=self.params_dtype
+            embd_dim,
+            use_bias=self.use_bias,
         )(x)
 
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
@@ -124,13 +120,12 @@ class AttentionBlock(nn.Module):
     use_bias: bool = True
     proj_kernel_init_norm: float = 1.0
     reduce_ops_dtype: jnp.dtype = jnp.float32
-    params_dtype: jnp.dtype = None
 
     @nn.compact
     def __call__(self, x, train=True):
-        x_m = LayerNorm(
-            use_bias=self.use_bias, use_scale=True, dtype=self.params_dtype
-        )(x.astype(self.reduce_ops_dtype))
+        x_m = LayerNorm(use_bias=self.use_bias, use_scale=True)(
+            x.astype(self.reduce_ops_dtype)
+        )
         x_m = x_m.astype(x.dtype)
 
         x = (
@@ -138,25 +133,21 @@ class AttentionBlock(nn.Module):
                 use_bias=self.use_bias,
                 proj_kernel_init_norm=self.proj_kernel_init_norm,
                 reduce_ops_dtype=self.reduce_ops_dtype,
-                params_dtype=self.params_dtype,
             )(x_m, train=train)
             + x
         )
 
-        x_m = LayerNorm(
-            use_bias=self.use_bias, use_scale=True, dtype=self.params_dtype
-        )(x.astype(self.reduce_ops_dtype))
+        x_m = LayerNorm(use_bias=self.use_bias, use_scale=True)(
+            x.astype(self.reduce_ops_dtype)
+        )
         x_m = x_m.astype(x.dtype)
 
         x = (
             MLP(
-                use_bias=self.use_bias,
-                proj_kernel_init_norm=self.proj_kernel_init_norm,
-                params_dtype=self.params_dtype,
+                use_bias=self.use_bias, proj_kernel_init_norm=self.proj_kernel_init_norm
             )(x_m, train=train)
             + x
         )
-
         return x
 
 
@@ -170,7 +161,6 @@ class GPTConfig:
     dropout_rate: float = 0.0
     use_bias: bool = True  # True: bias in Dense and LayerNorms, like GPT-2. False: a bit better and faster
     reduce_ops_dtype: jnp.dtype = jnp.float32
-    params_dtype: jnp.dtype = None
 
 
 class GPT(nn.Module):
@@ -181,13 +171,11 @@ class GPT(nn.Module):
             num_embeddings=self.config.vocab_size,
             features=self.config.embd_dim,
             embedding_init=normal_initializer(std=0.02),
-            dtype=self.config.params_dtype,
         )
         self.positional_embeddings = nn.Embed(
             num_embeddings=self.config.block_size,
             features=self.config.embd_dim,
             embedding_init=normal_initializer(std=0.02),
-            dtype=self.config.params_dtype,
         )
 
         self.dropout = nn.Dropout(self.config.dropout_rate)
@@ -197,16 +185,11 @@ class GPT(nn.Module):
                 use_bias=self.config.use_bias,
                 proj_kernel_init_norm=jnp.sqrt(2 * self.config.num_layers),
                 reduce_ops_dtype=self.config.reduce_ops_dtype,
-                params_dtype=self.config.params_dtype,
             )
             for _ in range(self.config.num_layers)
         ]
 
-        self.layer_norm = LayerNorm(
-            use_bias=self.config.use_bias,
-            use_scale=True,
-            dtype=self.config.params_dtype,
-        )
+        self.layer_norm = LayerNorm(use_bias=self.config.use_bias, use_scale=True)
 
     def __call__(self, x, *, train=True, top_k=None):
         batch, seq_length = x.shape
