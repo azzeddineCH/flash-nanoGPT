@@ -94,7 +94,7 @@ validation_data_iter = DataLoader(
 
 # ============= Training Loop ============= #
 
-for i in range(start_iter, config.num_iters):
+for _ in range(start_iter, config.num_iters):
     # ============= Training ============= #
 
     t0 = time.time()
@@ -128,7 +128,12 @@ for i in range(start_iter, config.num_iters):
                     f"iter: {train_state.step} |  val loss {valid_loss} | train loss {train_loss}"
                 )
                 if config.save_checkpoint:
-                    trainer.save(train_state, metrics=TrainMetrics(loss=valid_loss))
+                    logging.info("saving checkpoint ...")
+                    saved = trainer.save(
+                        train_state, metrics=TrainMetrics(loss=valid_loss)
+                    )
+                    if saved:
+                        logging.info(f"checkpoint saved ...{train_state.step}")
 
         if config.wandb and jax.process_index() == 0:
             logs = {
@@ -148,7 +153,11 @@ for i in range(start_iter, config.num_iters):
             log(logs)
     # ============= Logging ============= #
 
-    if train_state.step % config.log_freq == 0 and jax.process_index() == 0:
+    if (
+        train_state.step == 1
+        and train_state.step % config.log_freq == 0
+        and jax.process_index() == 0
+    ):
         logging.info(
             f"iter: {train_state.step} | loss: {train_metrics.loss} | time_ms: {step_time_s * 1000}"
         )

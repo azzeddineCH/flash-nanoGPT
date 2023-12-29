@@ -297,7 +297,7 @@ class Trainer:
 
     def save(self, state: TrainState, metrics: TrainMetrics):
         state, metrics = jax.device_put((state, metrics), self.host)
-        saved = self.checkpointer.save(
+        return self.checkpointer.save(
             state.step,
             items=dict(
                 state=state,
@@ -305,8 +305,6 @@ class Trainer:
             ),
             metrics=dict(loss=float(metrics.loss)),
         )
-        if saved:
-            print(f"checkpoint saved ...{state.step}")
 
     def restore(self) -> Tuple:
         ckpt = self.checkpointer.restore(
