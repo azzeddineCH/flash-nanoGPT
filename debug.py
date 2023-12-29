@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import sys
 
 import jax
 import tyro
@@ -7,6 +8,8 @@ import tyro
 import wandb
 from config import Config, get_default_config
 from ds.loader import DataLoader
+
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
 def log(tree):
