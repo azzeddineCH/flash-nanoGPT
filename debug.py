@@ -6,7 +6,7 @@ import tyro
 
 import wandb
 from config import Config, get_default_config
-from ds.utils import Batch
+from ds.loader import DataLoader
 from training.trainer import Trainer
 from training.utils import TrainMetrics
 
@@ -59,14 +59,27 @@ elif config.restore == "gpt-2":
 if jax.process_index() == 0:
     print("Loading dataset ...")
 
-dummy_input = jax.random.randint(
-    key, (config.batch_size, config.block_size), minval=0, maxval=config.vocab_size
-)
+train_data_iter = DataLoader(
+    directory=config.dataset_dir,
+    batch_size=config.batch_size // jax.process_count(),
+    block_size=config.block_size,
+    split="train",
+    prefetch=config.prefetch,
+    buffer_size=config.buffer_size,
+    num_shards=jax.process_count(),
+    shard=jax.process_index(),
+).get_iterator()
 
-batch = Batch(
-    inputs=dummy_input,
-    labels=dummy_input,
-)
+validation_data_iter = DataLoader(
+    directory=config.dataset_dir,
+    batch_size=config.batch_size // jax.process_count(),
+    block_size=config.block_size,
+    split="val",
+    prefetch=config.prefetch,
+    buffer_size=config.buffer_size,
+    num_shards=8,
+    shard=jax.process_index() % 8,
+).get_iterator()
 
 # ============= Training Loop ============= #
 
@@ -74,7 +87,7 @@ for i in range(start_iter, config.num_iters):
     # ============= Training ============= #
 
     t0 = time.time()
-    train_batch = batch  # next(train_data_iter)
+    train_batch = next(train_data_iter)
     step_key, training_key = jax.random.split(training_key, 2)
     train_state, train_metrics = trainer.training_step(
         step_key, train_state, train_batch
@@ -86,8 +99,8 @@ for i in range(start_iter, config.num_iters):
         valid_loss = train_loss = 0
         train_eval_key, valid_eval_key, training_key = jax.random.split(training_key, 3)
         for j in range(config.eval_num_steps):
-            valid_batch = batch  # next(validation_data_iter)
-            train_batch = batch  # next(train_data_iter)
+            valid_batch = next(validation_data_iter)
+            train_batch = next(train_data_iter)
             valid_loss += (
                 trainer.validation_step(valid_eval_key, train_state, valid_batch)
                 / config.eval_num_steps
