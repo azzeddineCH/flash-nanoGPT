@@ -1,5 +1,9 @@
 from typing import Iterator
 
+import tensorflow as tf
+
+from ds.utils import decode_tf_record_example
+
 
 class DataLoader:
     def __init__(
@@ -10,7 +14,7 @@ class DataLoader:
         block_size: int,
         num_shards: int = 1,
         shard: int = 0,
-        num_workers: int = 2,
+        num_workers: int = tf.data.AUTOTUNE,
         buffer_size: int = 5,
         prefetch: int = 2,
     ):
@@ -28,10 +32,6 @@ class DataLoader:
         self.dataset = self._load()
 
     def _load(self):
-        import tensorflow as tf
-
-        from ds.utils import decode_tf_record_example
-
         file_ds = tf.data.Dataset.list_files(f"{self.directory}/{self.split}*.tfrecord")
 
         file_ds = file_ds.shard(num_shards=self.num_shards, index=self.shard)
@@ -41,7 +41,6 @@ class DataLoader:
                 # build a tf Dataset from data files
                 filenames=file_ds,
                 num_parallel_reads=self.num_workers,
-                buffer_size=int(5e8),  # 500 MB
             )
             .map(
                 # decode each of the tfrecords

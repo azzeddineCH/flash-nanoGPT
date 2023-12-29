@@ -1,5 +1,4 @@
 import dataclasses
-import multiprocessing
 import time
 
 import jax
@@ -62,7 +61,6 @@ train_data_iter = DataLoader(
     buffer_size=config.buffer_size,
     num_shards=jax.process_count(),
     shard=jax.process_index(),
-    num_workers=multiprocessing.cpu_count() // 2,
 ).get_iterator()
 
 validation_data_iter = DataLoader(
@@ -74,9 +72,7 @@ validation_data_iter = DataLoader(
     buffer_size=config.buffer_size,
     num_shards=jax.process_count(),
     shard=jax.process_index(),
-    num_workers=multiprocessing.cpu_count() // 4,
 ).get_iterator()
-
 
 # ============= Training Loop ============= #
 
