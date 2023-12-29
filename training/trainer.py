@@ -215,15 +215,21 @@ class Trainer:
             rngs={"dropout": rng_key},
         )
 
+        print("------1")
+
         loss = optax.softmax_cross_entropy_with_integer_labels(
             logits=self.policy.cast_to_reduce_ops(logits), labels=batch.labels
         ).mean()
+
+        print("------2")
 
         loss = self.policy.cast_to_output(loss)
         if not train:
             return loss
 
         scaled_loss = state.loss_scale.scale(loss)
+
+        print("------3")
         return scaled_loss, loss
 
     def _validation_loss(self, _rng_key, _state, _batch):
@@ -236,9 +242,13 @@ class Trainer:
     ) -> Tuple[TrainState, TrainMetrics]:
         params = self.policy.cast_to_compute(state.params)
 
+        print("------4")
+
         (_, loss), grads = jax.value_and_grad(self._loss, argnums=1, has_aux=True)(
             rng_key, params, state, batch
         )
+
+        print("------5")
 
         grads = self.policy.cast_to_param(grads)
         grads = state.loss_scale.unscale(grads)
@@ -247,9 +257,13 @@ class Trainer:
             lambda g: jax.lax.pmean(g, axis_name="data"), grads
         )
 
+        print("------6")
+
         state = state.apply_gradients(
             grads=grads, skip_infinite=self.config.skip_infinite
         )
+
+        print("------7")
 
         metrics = TrainMetrics(
             loss=loss,
@@ -261,6 +275,7 @@ class Trainer:
 
     def _update_loop(self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch):
         rng_keys = jax.random.split(rng_key, self.config.grad_accum_steps)
+        print("------8")
         state, metrics = jax.lax.scan(
             f=lambda state, xs: self._update(
                 rng_key=xs[0],
