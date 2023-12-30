@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from typing import Tuple
 
-import flax.training.orbax_utils
 import jax
 import jmp
 import optax
@@ -312,14 +311,6 @@ class Trainer:
             items=dict(
                 state=state,
                 train_metrics=metrics,
-            ),
-            save_kwargs=dict(
-                state=dict(
-                    save_args=flax.training.orbax_utils.save_args_from_target(state)
-                ),
-                train_metrics=dict(
-                    save_args=flax.training.orbax_utils.save_args_from_target(metrics)
-                ),
             ),
             metrics=dict(loss=float(metrics.loss)),
         )
