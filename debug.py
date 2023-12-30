@@ -42,5 +42,4 @@ elif config.restore == "gpt-2":
 
 if jax.process_index() == 0:
     logging.info(f"Train state created | model parameters : {train_state.num_params}")
-
-trainer.save(train_state, metrics=TrainMetrics(loss=0))
+    trainer.save(train_state, metrics=TrainMetrics(loss=0))
