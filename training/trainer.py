@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Tuple
 
@@ -92,6 +93,7 @@ class Trainer:
         )
 
         # ============= Checkpointing ============= #
+        os.makedirs(self.config.checkpoint_dir, exist_ok=True)
         self.checkpointer = ocp.CheckpointManager(
             Path(self.config.checkpoint_dir).absolute(),
             checkpointers=dict(
