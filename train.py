@@ -15,7 +15,7 @@ from training.utils import TrainMetrics
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 # ============= Init tpu pod ============= #
-# jax.distributed.initialize()
+jax.distributed.initialize()
 
 if jax.process_index() == 0:
     logging.info(
