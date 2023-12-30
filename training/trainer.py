@@ -49,7 +49,6 @@ class Trainer:
             )
 
         # ============= Sharding Policy ============= #
-        self.host = jax.local_devices(jax.process_index(), "cpu")[0]
 
         self.device_mesh = self._make_device_mesh()
 
@@ -297,7 +296,6 @@ class Trainer:
         return jax.lax.pmean(loss, axis_name="data")
 
     def save(self, state: TrainState, metrics: TrainMetrics):
-        state, metrics = jax.device_put((state, metrics), self.host)
         return self.checkpointer.save(
             state.step,
             items=dict(

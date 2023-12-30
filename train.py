@@ -17,11 +17,6 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 jax.distributed.initialize()
 
 
-def log(tree):
-    host = jax.local_devices(jax.process_index(), "cpu")[0]
-    wandb.log(jax.device_put(tree, host))
-
-
 if jax.process_index() == 0:
     logging.info(
         f"TPU pod initialized, {jax.process_count()} host/s, {jax.local_device_count()} core per host, {jax.device_count()} total"
@@ -150,7 +145,7 @@ for i in range(start_iter, config.num_iters):
                 # ignore compilation time
                 logs["time_ms"] = step_time_s * 1000
 
-            log(logs)
+            wandb.log(logs)
     # ============= Logging ============= #
 
     if train_state.step % config.log_freq == 0 and jax.process_index() == 0:
