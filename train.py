@@ -116,10 +116,8 @@ for _ in range(start_iter, config.num_iters):
             logging.info(
                 f"iter: {train_state.step} | val loss {valid_loss} | train loss {train_loss}"
             )
-            if config.save_checkpoint and trainer.save(
-                train_state, metrics=TrainMetrics(loss=valid_loss)
-            ):
-                logging.info(f"checkpoint saved ...{train_state.step}")
+            if config.save_checkpoint:
+                trainer.save(train_state, metrics=TrainMetrics(loss=valid_loss))
 
             if config.wandb:
                 wandb.log(
@@ -131,7 +129,7 @@ for _ in range(start_iter, config.num_iters):
                         "loss_scale": train_state.loss_scale.loss_scale,
                         "grads_gnorm": train_metrics.grads_gnorm,
                         "params_gnorm": train_metrics.params_gnorm,
-                        "time_ms": step_time_ms if train_state.step > 1 else None,
+                        "time_ms": step_time_ms if train_state.step > 1 else 0,
                     },
                     step=train_state.step,
                 )

@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from typing import Tuple
@@ -13,7 +14,6 @@ from jax import tree_util as trx
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.random import PRNGKeyArray
-from orbax.checkpoint import AsyncCheckpointer, PyTreeCheckpointHandler
 
 from config import Config
 from ds.utils import Batch
@@ -97,14 +97,13 @@ class Trainer:
         self.checkpointer = ocp.CheckpointManager(
             Path(self.config.checkpoint_dir).absolute(),
             checkpointers=dict(
-                state=AsyncCheckpointer(PyTreeCheckpointHandler()),
-                train_metrics=AsyncCheckpointer(PyTreeCheckpointHandler()),
+                state=ocp.PyTreeCheckpointer(),
+                train_metrics=ocp.PyTreeCheckpointer(),
             ),
             options=ocp.CheckpointManagerOptions(
                 max_to_keep=2,
                 best_fn=lambda metrics: metrics["loss"],
                 best_mode="min",
-                cleanup_tmp_directories=True,
             ),
         )
 
@@ -297,7 +296,7 @@ class Trainer:
         return jax.lax.pmean(loss, axis_name="data")
 
     def save(self, state: TrainState, metrics: TrainMetrics):
-        return self.checkpointer.save(
+        saved = self.checkpointer.save(
             state.step,
             items=dict(
                 state=state,
@@ -305,6 +304,9 @@ class Trainer:
             ),
             metrics=dict(loss=float(metrics.loss)),
         )
+
+        if saved:
+            logging.info(f"checkpoint saved ...{state.step}")
 
     def restore(self) -> Tuple:
         ckpt = self.checkpointer.restore(
