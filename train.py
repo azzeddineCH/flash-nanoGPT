@@ -16,7 +16,6 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 jax.distributed.initialize()
 
-
 if jax.process_index() == 0:
     logging.info(
         f"TPU pod initialized, {jax.process_count()} host/s, {jax.local_device_count()} core per host, {jax.device_count()} total"
@@ -91,7 +90,7 @@ validation_data_iter = DataLoader(
 
 # ============= Training Loop ============= #
 
-for i in range(start_iter, config.num_iters):
+for _ in range(start_iter, config.num_iters):
     # ============= Training ============= #
     t0 = time.time()
     train_batch = next(train_data_iter)
@@ -145,9 +144,9 @@ for i in range(start_iter, config.num_iters):
                 # ignore compilation time
                 logs["time_ms"] = step_time_s * 1000
 
-            wandb.log(logs)
-    # ============= Logging ============= #
+            wandb.log(logs, step=train_state.step)
 
+    # ============= Logging ============= #
     if train_state.step % config.log_freq == 0 and jax.process_index() == 0:
         logging.info(
             f"iter: {train_state.step} | loss: {train_metrics.loss} | time_ms: {step_time_s * 1000}"
