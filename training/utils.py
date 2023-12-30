@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 import jax
 import jmp
@@ -20,3 +21,9 @@ class Policy(jmp.Policy):
 
     def cast_to_reduce_ops(self, x):
         return _cast_floating_to(x, self.reduce_ops_dtype)
+
+
+def get_time_string():
+    current_time = datetime.now()
+    time_string = current_time.strftime("%m_%d_%H_%M")
+    return time_string

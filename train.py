@@ -131,7 +131,7 @@ for _ in range(start_iter, config.num_iters):
                         "params_gnorm": train_metrics.params_gnorm,
                         "time_ms": step_time_ms if train_state.step > 1 else 0,
                     },
-                    step=int(train_state.step),
+                    step=train_state.step,
                     commit=True,
                 )
 

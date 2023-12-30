@@ -4,7 +4,7 @@ eval_freq: 1000
 eval_num_steps: 200
 save_checkpoint: true
 restore: "scratch"  # scratch | pre-trained | gpt
-checkpoint_dir: "checkpoints"
+checkpoint_dir: "gs://flash-nano-gpt-bucket/data/checkpoints"
 log_freq: 10
 wandb: true
 wandb_project_name: "flash-nano-gpt"

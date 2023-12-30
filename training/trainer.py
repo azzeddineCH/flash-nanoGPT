@@ -14,12 +14,13 @@ from jax import tree_util as trx
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.random import PRNGKeyArray
+from orbax.checkpoint.utils import is_gcs_path
 
 from config import Config
 from ds.utils import Batch
 from training.model import GPT, GPTConfig
 from training.state import DynamicLossScale, TrainState
-from training.utils import Policy, TrainMetrics
+from training.utils import Policy, TrainMetrics, get_time_string
 
 
 class Trainer:
@@ -93,9 +94,18 @@ class Trainer:
         )
 
         # ============= Checkpointing ============= #
-        os.makedirs(self.config.checkpoint_dir, exist_ok=True)
+
+        ckpt_dir = os.path.join(
+            self.config.checkpoint_dir,
+            f"{self.config.wandb_run_id}-{get_time_string()}",
+        )
+        if not is_gcs_path(ckpt_dir):
+            ckpt_dir = Path(ckpt_dir)
+            ckpt_dir.mkdir(exist_ok=True, parents=True)
+            ckpt_dir = ckpt_dir.absolute()
+
         self.checkpointer = ocp.CheckpointManager(
-            Path(self.config.checkpoint_dir).absolute(),
+            ckpt_dir,
             checkpointers=dict(
                 state=ocp.PyTreeCheckpointer(),
                 train_metrics=ocp.PyTreeCheckpointer(),
