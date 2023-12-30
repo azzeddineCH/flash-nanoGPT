@@ -295,7 +295,6 @@ class Trainer:
         return jax.lax.pmean(loss, axis_name="data")
 
     def save(self, state: TrainState, metrics: TrainMetrics):
-        state, metrics = jax.device_put((state, metrics), jax.local_devices()[0])
         return self.checkpointer.save(
             state.step,
             items=dict(
