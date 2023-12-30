@@ -13,6 +13,7 @@ from jax import tree_util as trx
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.random import PRNGKeyArray
+from orbax.checkpoint import AsyncCheckpointer, PyTreeCheckpointHandler
 
 from config import Config
 from ds.utils import Batch
@@ -99,11 +100,11 @@ class Trainer:
         self.checkpointer = ocp.CheckpointManager(
             Path(self.config.checkpoint_dir).absolute(),
             checkpointers=dict(
-                state=ocp.PyTreeCheckpointer(),
+                state=AsyncCheckpointer(PyTreeCheckpointHandler()),
                 train_metrics=ocp.PyTreeCheckpointer(),
             ),
             options=ocp.CheckpointManagerOptions(
-                max_to_keep=3,
+                max_to_keep=2,
                 best_fn=lambda metrics: metrics["loss"],
                 best_mode="min",
             ),
@@ -319,6 +320,9 @@ class Trainer:
         loss = ckpt["train_metrics"].loss
 
         return state, loss
+
+    def close(self):
+        self.checkpointer.wait_until_finished()
 
     def restore_openai_gpt(self):
         pass

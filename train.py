@@ -96,23 +96,13 @@ validation_data_iter = DataLoader(
 
 for i in range(start_iter, config.num_iters):
     # ============= Training ============= #
-    if jax.process_index() == 0:
-        logging.info(f"getting batch iter {i}")
-
     t0 = time.time()
     train_batch = next(train_data_iter)
-
-    if jax.process_index() == 0:
-        logging.info(f"starting training iter {i}")
-
     step_key, training_key = jax.random.split(training_key, 2)
     train_state, train_metrics = trainer.training_step(
         step_key, train_state, train_batch
     )
     step_time_s = time.time() - t0
-
-    if jax.process_index() == 0:
-        logging.info(f"finishing training iter {i} time {step_time_s}")
 
     # ============= Evaluation ============= #
     if train_state.step == 1 or train_state.step % config.eval_freq == 0:
@@ -134,10 +124,9 @@ for i in range(start_iter, config.num_iters):
             best_valid_loss = valid_loss
             if jax.process_index() == 0:
                 logging.info(
-                    f"iter: {train_state.step} |  val loss {valid_loss} | train loss {train_loss}"
+                    f"iter: {train_state.step} | val loss {valid_loss} | train loss {train_loss}"
                 )
                 if config.save_checkpoint:
-                    logging.info("saving checkpoint ...")
                     saved = trainer.save(
                         train_state, metrics=TrainMetrics(loss=valid_loss)
                     )
@@ -167,5 +156,7 @@ for i in range(start_iter, config.num_iters):
             f"iter: {train_state.step} | loss: {train_metrics.loss} | time_ms: {step_time_s * 1000}"
         )
 
-if config.wandb and jax.process_index() == 0:
-    wandb.finish()
+if jax.process_index() == 0:
+    trainer.close()
+    if config.wandb:
+        wandb.finish()
