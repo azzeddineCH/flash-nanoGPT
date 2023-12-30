@@ -15,7 +15,7 @@ from training.utils import TrainMetrics
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 # ============= Init tpu pod ============= #
-jax.distributed.initialize()
+# jax.distributed.initialize()
 
 if jax.process_index() == 0:
     logging.info(
@@ -83,16 +83,19 @@ for _ in range(start_iter, config.num_iters):
     # ============= Training ============= #
     t0 = time.time()
     train_batch = next(train_data_iter)
-    step_key, training_key = jax.random.split(training_key, 2)
+
+    iter_key = jax.random.fold_in(training_key, train_state.step)
+    training_step_key, iter_key = jax.random.split(iter_key, 2)
+
     train_state, train_metrics = trainer.training_step(
-        step_key, train_state, train_batch
+        training_step_key, train_state, train_batch
     )
     step_time_ms = (time.time() - t0) * 1000
 
     # ============= Evaluation ============= #
     if train_state.step == 1 or train_state.step % config.eval_freq == 0:
         valid_loss = train_loss = 0
-        train_eval_key, valid_eval_key, training_key = jax.random.split(training_key, 3)
+        train_eval_key, valid_eval_key, iter_key = jax.random.split(iter_key, 3)
         for j in range(config.eval_num_steps):
             valid_batch = next(validation_data_iter)
             train_batch = next(train_data_iter)

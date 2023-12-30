@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Tuple
 
@@ -93,7 +92,6 @@ class Trainer:
         )
 
         # ============= Checkpointing ============= #
-        os.makedirs(self.config.checkpoint_dir, exist_ok=True)
         self.checkpointer = ocp.CheckpointManager(
             Path(self.config.checkpoint_dir).absolute(),
             checkpointers=dict(
@@ -104,6 +102,7 @@ class Trainer:
                 max_to_keep=2,
                 best_fn=lambda metrics: metrics["loss"],
                 best_mode="min",
+                cleanup_tmp_directories=True,
             ),
         )
 
@@ -193,7 +192,7 @@ class Trainer:
 
     def _loss(
         self,
-        rng_key: PRNGKeyArray,
+        dropout_key: PRNGKeyArray,
         params: PyTreeNode,
         state: TrainState,
         batch: Batch,
@@ -213,7 +212,7 @@ class Trainer:
             variables={"params": params},
             x=batch.inputs,
             train=train,
-            rngs={"dropout": rng_key},
+            rngs={"dropout": dropout_key},
         )
 
         loss = optax.softmax_cross_entropy_with_integer_labels(
@@ -228,12 +227,12 @@ class Trainer:
         return scaled_loss, loss
 
     def _update(
-        self, rng_key: PRNGKeyArray, batch: Batch, state: TrainState
+        self, update_key: PRNGKeyArray, batch: Batch, state: TrainState
     ) -> Tuple[TrainState, TrainMetrics]:
         # ============= cast params to half precision for forward and back propagation ============= #
         params = self.policy.cast_to_compute(state.params)
         (_, loss), grads = jax.value_and_grad(self._loss, argnums=1, has_aux=True)(
-            rng_key, params, state, batch
+            update_key, params, state, batch
         )
 
         # =============  cast the grads to full precision for updating the weights ============= #
@@ -260,7 +259,7 @@ class Trainer:
         return state, metrics
 
     def _training_step(
-        self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
+        self, step_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> Tuple[TrainState, TrainMetrics]:
         # ============= adding grad accumulation dim ============= #
         batch = trx.tree_map(
@@ -272,14 +271,16 @@ class Trainer:
             batch,
         )
 
-        rng_keys = jax.random.split(
-            rng_key, num=self.device_mesh.size * self.config.grad_accum_steps
+        grad_accum_keys = jax.random.split(
+            step_key, num=self.device_mesh.size * self.config.grad_accum_steps
         ).reshape(self.config.grad_accum_steps, -1)
 
         # ============= running update loop on grad_accum dim ============= #
         for mini_step in range(self.config.grad_accum_steps):
             state, metrics = self.update(
-                rng_keys[mini_step], jax.tree_map(lambda d: d[mini_step], batch), state
+                grad_accum_keys[mini_step],
+                jax.tree_map(lambda d: d[mini_step], batch),
+                state,
             )
         # ============= average the metrics across grad accumulation steps ============= #
         metrics = trx.tree_map(lambda m: jnp.mean(m), metrics)
@@ -294,6 +295,7 @@ class Trainer:
         return jax.lax.pmean(loss, axis_name="data")
 
     def save(self, state: TrainState, metrics: TrainMetrics):
+        state, metrics = jax.device_put((state, metrics), jax.local_devices()[0])
         return self.checkpointer.save(
             state.step,
             items=dict(
