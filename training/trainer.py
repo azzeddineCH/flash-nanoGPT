@@ -18,7 +18,7 @@ from orbax.checkpoint import AsyncCheckpointer, PyTreeCheckpointHandler
 from config import Config
 from ds.utils import Batch
 from training.model import GPT, GPTConfig
-from training.state import TrainState
+from training.state import DynamicLossScale, TrainState
 from training.utils import Policy, TrainMetrics
 
 
@@ -70,11 +70,11 @@ class Trainer:
             check_rep=False,
         )
 
-        _sharded_validation_step = shard_map(
-            f=self._validation_step,
+        _sharded_eval_step = shard_map(
+            f=self._eval_step,
             mesh=self.device_mesh,
             in_specs=(
-                self.replicated_specs,  # rng_keys (rng keys are ignored in validation)
+                self.replicated_specs,  # rng_keys (rng keys are ignored in eval)
                 self.replicated_specs,  # state
                 self.data_sharding_spec,  # batch
             ),
@@ -84,10 +84,8 @@ class Trainer:
 
         # ============= Jitting methods  ============= #
 
-        self.validation_step = (
-            jax.jit(_sharded_validation_step)
-            if config.jit
-            else _sharded_validation_step
+        self.eval_step = (
+            jax.jit(_sharded_eval_step) if config.jit else _sharded_eval_step
         )
 
         self.training_step = (
@@ -100,7 +98,7 @@ class Trainer:
             Path(self.config.checkpoint_dir).absolute(),
             checkpointers=dict(
                 state=AsyncCheckpointer(PyTreeCheckpointHandler()),
-                train_metrics=ocp.PyTreeCheckpointer(),
+                train_metrics=AsyncCheckpointer(PyTreeCheckpointHandler()),
             ),
             options=ocp.CheckpointManagerOptions(
                 max_to_keep=2,
@@ -181,7 +179,7 @@ class Trainer:
 
         scale = jmp.NoOpLossScale()
         if self.config.amp and not self.on_tpu:
-            scale = jmp.DynamicLossScale(jnp.asarray(2.0**15, dtype=jnp.float32))
+            scale = DynamicLossScale(jnp.asarray(2.0**15, dtype=jnp.float32))
 
         state = TrainState.create(
             apply_fn=model.apply,
@@ -288,7 +286,7 @@ class Trainer:
 
         return state, metrics
 
-    def _validation_step(
+    def _eval_step(
         self, rng_key: PRNGKeyArray, state: TrainState, batch: Batch
     ) -> jax.Array:
         params = self.policy.cast_to_compute(state.params)

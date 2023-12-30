@@ -14,6 +14,7 @@ from training.utils import TrainMetrics
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
+# ============= Init tpu pod ============= #
 jax.distributed.initialize()
 
 if jax.process_index() == 0:
@@ -22,11 +23,9 @@ if jax.process_index() == 0:
     )
 
 # ============= Init configs ============= #
-
 config = tyro.cli(Config, default=get_default_config())
 
 # ============= Init Logging ============= #
-
 if config.wandb and jax.process_index() == 0:
     wandb.init(
         project=config.wandb_project_name,
@@ -35,20 +34,14 @@ if config.wandb and jax.process_index() == 0:
     )
 
 # ============= Init Random keys loaders ============= #
-
 key = jax.random.PRNGKey(config.seed)
 state_key, training_key, key = jax.random.split(key, 3)
 training_key = jax.random.fold_in(training_key, jax.process_index())
 
 # ============= Init training state ============= #
-
 trainer = Trainer(config=config)
-
 start_iter = 0
 best_valid_loss = 1e6
-
-if jax.process_index() == 0:
-    logging.info("Creating Train state ...")
 
 if config.restore == "scratch":
     train_state = trainer.make_train_state(state_key)
@@ -63,9 +56,6 @@ if jax.process_index() == 0:
     logging.info(f"Train state created | model parameters : {train_state.num_params}")
 
 # ============= Init ds loaders ============= #
-if jax.process_index() == 0:
-    logging.info("Loading dataset ...")
-
 train_data_iter = DataLoader(
     directory=config.dataset_dir,
     batch_size=config.batch_size // jax.process_count(),
@@ -89,7 +79,6 @@ validation_data_iter = DataLoader(
 ).get_iterator()
 
 # ============= Training Loop ============= #
-
 for _ in range(start_iter, config.num_iters):
     # ============= Training ============= #
     t0 = time.time()
@@ -98,7 +87,7 @@ for _ in range(start_iter, config.num_iters):
     train_state, train_metrics = trainer.training_step(
         step_key, train_state, train_batch
     )
-    step_time_s = time.time() - t0
+    step_time_ms = (time.time() - t0) * 1000
 
     # ============= Evaluation ============= #
     if train_state.step == 1 or train_state.step % config.eval_freq == 0:
@@ -108,48 +97,46 @@ for _ in range(start_iter, config.num_iters):
             valid_batch = next(validation_data_iter)
             train_batch = next(train_data_iter)
             valid_loss += (
-                trainer.validation_step(valid_eval_key, train_state, valid_batch)
+                trainer.eval_step(valid_eval_key, train_state, valid_batch)
                 / config.eval_num_steps
             )
             train_loss += (
-                trainer.validation_step(train_eval_key, train_state, train_batch)
+                trainer.eval_step(train_eval_key, train_state, train_batch)
                 / config.eval_num_steps
             )
 
-        if valid_loss < best_valid_loss:
-            best_valid_loss = valid_loss
-            if jax.process_index() == 0:
-                logging.info(
-                    f"iter: {train_state.step} | val loss {valid_loss} | train loss {train_loss}"
+        best_valid_loss = (
+            valid_loss if valid_loss < best_valid_loss else best_valid_loss
+        )
+        if jax.process_index() == 0:
+            # ============= Checkpointing and logging ============= #
+            logging.info(
+                f"iter: {train_state.step} | val loss {valid_loss} | train loss {train_loss}"
+            )
+            if config.save_checkpoint and trainer.save(
+                train_state, metrics=TrainMetrics(loss=valid_loss)
+            ):
+                logging.info(f"checkpoint saved ...{train_state.step}")
+
+            if config.wandb:
+                wandb.log(
+                    {
+                        "iter": train_state.step,
+                        "train/loss": train_loss,
+                        "val/loss": valid_loss,
+                        "lr": train_state.lr,
+                        "loss_scale": train_state.loss_scale.loss_scale,
+                        "grads_gnorm": train_metrics.grads_gnorm,
+                        "params_gnorm": train_metrics.params_gnorm,
+                        "time_ms": step_time_ms if train_state.step > 1 else None,
+                    },
+                    step=train_state.step,
                 )
-                if config.save_checkpoint:
-                    saved = trainer.save(
-                        train_state, metrics=TrainMetrics(loss=valid_loss)
-                    )
-                    if saved:
-                        logging.info(f"checkpoint saved ...{train_state.step}")
 
-        if config.wandb and jax.process_index() == 0:
-            logs = {
-                "iter": train_state.step,
-                "train/loss": train_loss,
-                "val/loss": valid_loss,
-                "lr": train_state.lr,
-                "loss_scale": train_state.loss_scale.loss_scale,
-                "grads_gnorm": train_metrics.grads_gnorm,
-                "params_gnorm": train_metrics.params_gnorm,
-            }
-
-            if train_state.step > 1:
-                # ignore compilation time
-                logs["time_ms"] = step_time_s * 1000
-
-            wandb.log(logs, step=train_state.step)
-
-    # ============= Logging ============= #
+    # ============= Terminal logging ============= #
     if train_state.step % config.log_freq == 0 and jax.process_index() == 0:
         logging.info(
-            f"iter: {train_state.step} | loss: {train_metrics.loss} | time_ms: {step_time_s * 1000}"
+            f"iter: {train_state.step} | loss: {train_metrics.loss} | time_ms: {step_time_ms}"
         )
 
 if jax.process_index() == 0:

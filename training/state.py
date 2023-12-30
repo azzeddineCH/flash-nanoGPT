@@ -1,7 +1,10 @@
+from dataclasses import asdict
+
 import jax
 import jmp
 import optax
 from flax.training.train_state import TrainState as _TrainState
+from jax import numpy as jnp
 
 
 class TrainState(_TrainState):
@@ -51,3 +54,17 @@ class TrainState(_TrainState):
             opt_state=opt_state,
             **kwargs,
         )
+
+
+# dirty fix: a wrapper class around jmp.DynamicLossScale to avoid a nasty
+# checkpointing error due to Orbax save-args
+class DynamicLossScale(jmp.DynamicLossScale):
+    def __post_init__(self) -> None:
+        pass
+
+    def adjust(self, grads_finite: jnp.ndarray) -> "DynamicLossScale":
+        _base = super().adjust(grads_finite)
+        return DynamicLossScale(**asdict(_base))
+
+
+jax.tree_util.register_pytree_node_class(DynamicLossScale)
