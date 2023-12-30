@@ -49,7 +49,7 @@ class Trainer:
             )
 
         # ============= Sharding Policy ============= #
-        self.host = jax.devices("cpu")[0]
+        self.host = jax.local_devices(jax.process_index(), "cpu")[0]
 
         self.device_mesh = self._make_device_mesh()
 

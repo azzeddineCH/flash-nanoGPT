@@ -16,11 +16,10 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
 def log(tree):
-    host = jax.devices("cpu")[0]
+    host = jax.local_devices(jax.process_index(), "cpu")[0]
     wandb.log(jax.device_put(tree, host))
 
 
-jax.distributed.initialize()
 if jax.process_index() == 0:
     logging.info(
         f"TPU pod initialized, {jax.process_count()} host/s, {jax.local_device_count()} core per host, {jax.device_count()} total"
