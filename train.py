@@ -14,6 +14,8 @@ from training.utils import TrainMetrics
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
+jax.distributed.initialize()
+
 
 def log(tree):
     host = jax.local_devices(jax.process_index(), "cpu")[0]
@@ -160,3 +162,5 @@ if jax.process_index() == 0:
     trainer.close()
     if config.wandb:
         wandb.finish()
+
+jax.distributed.shutdown()
