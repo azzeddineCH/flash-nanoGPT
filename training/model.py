@@ -153,14 +153,14 @@ class AttentionBlock(nn.Module):
 
     def __call__(self, x, train=True):
         x_l1 = self.l1(x.astype(self.reduce_ops_dtype))
-        x = x_l1.astype(x.dtype)
+        x_l1 = x_l1.astype(x.dtype)
 
-        x = self.attention(x, train=train) + x
+        x = self.attention(x_l1, train=train) + x
 
         x_l2 = self.l2(x.astype(self.reduce_ops_dtype))
-        x = x_l2.astype(x.dtype)
+        x_l2 = x_l2.astype(x.dtype)
 
-        x = self.mlp(x, train=train) + x
+        x = self.mlp(x_l2, train=train) + x
 
         return x
 
