@@ -1,7 +1,7 @@
 !dataclass:Config
 # checkpoint and eval
 eval_freq: 1000
-eval_num_steps: 200
+eval_num_steps: 50 # using 50 instead of 200 to finish early (TPUuuuus :( !! )
 save_checkpoint: true
 restore: "scratch"  # scratch | pre-trained | gpt
 checkpoint_dir: "gs://flash-nano-gpt-bucket/data/checkpoints"
