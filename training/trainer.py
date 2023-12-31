@@ -287,12 +287,12 @@ class Trainer:
         ).reshape(self.config.grad_accum_steps, -1)
 
         # ============= running update loop on grad_accum dim ============= #
-        for mini_step in range(self.config.grad_accum_steps):
-            state, metrics = self.update(
-                grad_accum_keys[mini_step],
-                jax.tree_map(lambda d: d[mini_step], batch),
-                state,
-            )
+        state, metrics = jax.lax.scan(
+            f=lambda _state, xs: self.update(xs[0], xs[1], _state),
+            xs=(grad_accum_keys, batch),
+            init=state,
+        )
+
         # ============= average the metrics across grad accumulation steps ============= #
         metrics = trx.tree_map(lambda m: jnp.mean(m), metrics)
 

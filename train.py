@@ -136,7 +136,9 @@ for _ in range(start_iter, config.num_iters):
                 )
 
     # ============= Terminal logging ============= #
-    if train_state.step % config.log_freq == 0 and jax.process_index() == 0:
+    if (
+        train_state.step == 1 or train_state.step % config.log_freq == 0
+    ) and jax.process_index() == 0:
         logging.info(
             f"iter: {train_state.step} | loss: {train_metrics.loss} | time_ms: {step_time_ms}"
         )
