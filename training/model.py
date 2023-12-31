@@ -57,7 +57,11 @@ class CasualAttention(nn.Module):
         ).transpose([0, 2, 1, 3])
 
         # batch, num_head, seq_length, seq_length
-        dot_product = q @ k.transpose([0, 1, 3, 2]) * (1.0 / jnp.sqrt(k.shape[-1]))
+        dot_product = (
+            q
+            @ k.transpose([0, 1, 3, 2])
+            * (1.0 / jnp.sqrt(k.shape[-1])).astype(x.dtype)
+        )
 
         # batch, num_head, seq_length, seq_length
         casual_mask = nn.make_causal_mask(
@@ -130,7 +134,7 @@ class AttentionBlock(nn.Module):
 
     def setup(self):
         self.l1 = LayerNorm(
-            use_bias=self.use_bias, param_dtype=self.param_dtype, use_scale=True
+            use_bias=self.use_bias, use_scale=True, param_dtype=self.param_dtype
         )
         self.attention = CasualAttention(
             use_bias=self.use_bias,
@@ -148,14 +152,12 @@ class AttentionBlock(nn.Module):
         )
 
     def __call__(self, x, train=True):
-        x_l1 = x.astype(self.reduce_ops_dtype)
-        x_l1 = self.l1(x_l1)
+        x_l1 = self.l1(x.astype(self.reduce_ops_dtype))
         x = x_l1.astype(x.dtype)
 
         x = self.attention(x, train=train) + x
 
-        x_l2 = x.astype(self.reduce_ops_dtype)
-        x_l2 = self.l2(x_l2)
+        x_l2 = self.l2(x.astype(self.reduce_ops_dtype))
         x = x_l2.astype(x.dtype)
 
         x = self.mlp(x, train=train) + x

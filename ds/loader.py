@@ -64,7 +64,6 @@ class DataLoader:
                 self.batch_size,
                 drop_remainder=True,
             )
-            .shuffle(self.buffer_size)
             .prefetch(
                 # prefetch the next N batches while training running on the accelerator
                 self.prefetch
