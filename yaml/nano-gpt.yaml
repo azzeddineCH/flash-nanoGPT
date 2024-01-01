@@ -1,7 +1,7 @@
 !dataclass:Config
 # checkpoint and eval
 eval_freq: 1000
-eval_num_steps: 50 # using 50 instead of 200 to finish early (TPUuuuus :( !! )
+eval_num_steps: 200
 save_checkpoint: true
 restore: "scratch"  # scratch | pre-trained | gpt
 checkpoint_dir: "gs://flash-nano-gpt-bucket/data/checkpoints"
@@ -13,7 +13,7 @@ wandb_run_id: "nano-gpt"
 dataset_dir: "gs://flash-nano-gpt-bucket/data/openwebtext"
 vocab_size: 50304
 grad_accum_steps: 1
-batch_size: 512
+batch_size: 480
 block_size: 1024
 buffer_size: 128
 prefetch: 2
@@ -21,14 +21,14 @@ prefetch: 2
 num_layers: 12
 num_heads: 12
 embd_dim: 768
-dropout_rate: 0.2
+dropout_rate: 0.0
 use_bias: false
 # Optimizer
-num_iters: 150000
+num_iters: 600000
 lr: 0.0006
 lr_decay: true
 lr_warmup_iters: 1000
-lr_decay_iters: 150000
+lr_decay_iters: 600000
 lr_min: 0.00006
 weight_decay: 0.1
 beta1: 0.9
