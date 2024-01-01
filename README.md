@@ -1,7 +1,9 @@
-# flash-nanoGPT (Under development)
+# ⚡⚡ flash-nanoGPT ⚡⚡
 
-a jax (flax) re-write of Andrej Karpathy NanoGPT, this repository will hold a collection of Jax/Flax new features like :
-Pallas kernel language for flashAttention on TPU, Data and tensor sharding with Jax on TPU
+a jax/flax re-write of Andrej Karpathy NanoGPT, this repository will hold a collection of Jax/Flax new features including :
+[Pallas]([url](https://jax.readthedocs.io/en/latest/pallas/index.html)) kernel language for flashAttention on TPU, sharding using the new [shmap]([url](https://jax.readthedocs.io/en/latest/jep/14273-shard-map.html)) primitive.
+
+A special thanks to the [TPU Research Cloud team]([url](https://sites.research.google/trc/about/)) for providing serval TPU v2-8 and v3-32 instances!
 
 ## Todos
 
@@ -18,5 +20,7 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [ ] Reproducing results on OpenWebText dataset
 - [ ] Loading GPTs pre-trained models
 - [ ] Fine tuning GPT-2 weights on Shakespear dataset
-- [ ] Profiling/Benchmarking and speeding up iteration
+- [ ] inference script 
+- [ ] Profiling/Benchmarking and speeding up iteration/inference
+- [ ] Providing Google cloud manuall
 - [ ] Flash attention with Pallas
