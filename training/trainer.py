@@ -151,6 +151,15 @@ class Trainer:
         return model, state["params"]
 
     def _make_optimizer(self, params: PyTreeNode) -> optax.MultiSteps:
+        def _to_decay(p):
+            is_embeddings = (
+                p.shape == params["token_embeddings"]["embedding"].shape
+                or p.shape == params["positional_embeddings"]["embedding"].shape
+            )
+            is_flat = p.ndim < 2
+
+            return not (is_embeddings or is_flat)
+
         # ============= learning rate schedular ============= #
         schedule = optax.warmup_cosine_decay_schedule(
             init_value=0.0,
@@ -166,7 +175,7 @@ class Trainer:
             b1=self.config.beta1,
             b2=self.config.beta2,
             weight_decay=self.config.weight_decay,
-            mask=trx.tree_map(lambda p: p.ndim >= 2, params),
+            mask=trx.tree_map(_to_decay, params),
         )
 
         # ============= gradient global norm clipping ============= #
