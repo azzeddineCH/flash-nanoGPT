@@ -1,6 +1,6 @@
 # ⚡⚡ flash-nanoGPT ⚡⚡
 
-a jax/flax re-write of Andrej Karpathy NanoGPT, this repository will hold a collection of Jax/Flax new features including :
+a jax/flax re-write of [Andrej Karpathy NanoGPT]([url](https://github.com/karpathy/nanoGPT)), this repository will hold a collection of Jax/Flax new features including :
 [Pallas]([url](https://jax.readthedocs.io/en/latest/pallas/index.html)) kernel language for flashAttention on TPU, sharding using the new [shmap]([url](https://jax.readthedocs.io/en/latest/jep/14273-shard-map.html)) primitive.
 
 A special thanks to the [TPU Research Cloud team]([url](https://sites.research.google/trc/about/)) for providing serval TPU v2-8 and v3-32 instances!
