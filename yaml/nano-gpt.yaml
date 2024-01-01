@@ -27,7 +27,7 @@ use_bias: false
 num_iters: 600000
 lr: 0.0006
 lr_decay: true
-lr_warmup_iters: 1000
+lr_warmup_iters: 2000
 lr_decay_iters: 600000
 lr_min: 0.00006
 weight_decay: 0.1

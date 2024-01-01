@@ -21,7 +21,7 @@ def make_dense(kernel_init_mean: float = 0, kernel_init_std: float = 1):
 
 
 HiddenDense = make_dense(kernel_init_std=0.02)
-LayerNorm = partial(nn.LayerNorm, epsilon=1e-5)
+LayerNorm = partial(nn.LayerNorm, epsilon=1e-5, use_scale=True)
 
 
 class CasualAttention(nn.Module):
@@ -36,34 +36,17 @@ class CasualAttention(nn.Module):
     def __call__(self, x, *, train=True):
         batch, seq_length, embd_dim = x.shape
 
-        q = HiddenDense(embd_dim, use_bias=self.use_bias, param_dtype=self.param_dtype)(
-            x
-        )
-        k = HiddenDense(embd_dim, use_bias=self.use_bias, param_dtype=self.param_dtype)(
-            x
-        )
-        v = HiddenDense(embd_dim, use_bias=self.use_bias, param_dtype=self.param_dtype)(
-            x
-        )
+        head_dim = embd_dim // self.num_heads
+        qkv = HiddenDense(
+            embd_dim * 3, use_bias=self.use_bias, param_dtype=self.param_dtype
+        )(x)
+        qkv = qkv.reshape(batch, seq_length, 3 * self.num_heads, head_dim)
+        q, k, v = jnp.split(qkv, indices_or_sections=3, axis=2)
 
-        q = q.reshape(
-            batch, seq_length, self.num_heads, embd_dim // self.num_heads
-        ).transpose([0, 2, 1, 3])
-        k = k.reshape(
-            batch, seq_length, self.num_heads, embd_dim // self.num_heads
-        ).transpose([0, 2, 1, 3])
-        v = v.reshape(
-            batch, seq_length, self.num_heads, embd_dim // self.num_heads
-        ).transpose([0, 2, 1, 3])
+        dot_product = jnp.einsum("...qhd,...khd->...hqk", q, k) * (
+            1.0 / jnp.sqrt(head_dim)
+        ).astype(x.dtype)
 
-        # batch, num_head, seq_length, seq_length
-        dot_product = (
-            q
-            @ k.transpose([0, 1, 3, 2])
-            * (1.0 / jnp.sqrt(k.shape[-1])).astype(x.dtype)
-        )
-
-        # batch, num_head, seq_length, seq_length
         casual_mask = nn.make_causal_mask(
             x=jnp.ones((batch, self.num_heads, seq_length))
         ).squeeze()
@@ -78,11 +61,8 @@ class CasualAttention(nn.Module):
             attn_scores, deterministic=not train
         )
 
-        # batch, num_head, seq_length, embd_dim // num_heads
-        attn_embeddings = attn_scores @ v
-
         # batch, seq_length, embd_dim
-        attn_embeddings = attn_embeddings.transpose([0, 2, 1, 3]).reshape(
+        attn_embeddings = jnp.einsum("...hqk, ...khd->...qhd", attn_scores, v).reshape(
             (batch, seq_length, -1)
         )
 
@@ -133,18 +113,14 @@ class AttentionBlock(nn.Module):
     param_dtype: jnp.dtype = jnp.float32
 
     def setup(self):
-        self.l1 = LayerNorm(
-            use_bias=self.use_bias, use_scale=True, param_dtype=self.param_dtype
-        )
+        self.l1 = LayerNorm(use_bias=self.use_bias, param_dtype=self.param_dtype)
         self.attention = CasualAttention(
             use_bias=self.use_bias,
             proj_kernel_init_norm=self.proj_kernel_init_norm,
             reduce_ops_dtype=self.reduce_ops_dtype,
             param_dtype=self.param_dtype,
         )
-        self.l2 = LayerNorm(
-            use_bias=self.use_bias, use_scale=True, param_dtype=self.param_dtype
-        )
+        self.l2 = LayerNorm(use_bias=self.use_bias, param_dtype=self.param_dtype)
         self.mlp = MLP(
             use_bias=self.use_bias,
             proj_kernel_init_norm=self.proj_kernel_init_norm,
@@ -209,7 +185,6 @@ class GPT(nn.Module):
 
         self.layer_norm = LayerNorm(
             use_bias=self.config.use_bias,
-            use_scale=True,
             param_dtype=self.config.param_dtype,
         )
 
