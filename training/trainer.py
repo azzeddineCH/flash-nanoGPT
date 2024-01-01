@@ -251,9 +251,7 @@ class Trainer:
         grads = state.loss_scale.unscale(grads)
 
         # ============= average grads and loss across replicas ============= #
-        grads = jax.tree_util.tree_map(
-            lambda g: jax.lax.pmean(g, axis_name="data"), grads
-        )
+        grads = jax.lax.pmean(grads, axis_name="data")
         loss = jax.lax.pmean(loss, axis_name="data")
 
         # ============= apply the gradients and skip the update if inf grads are found ============= #
