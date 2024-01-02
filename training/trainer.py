@@ -1,5 +1,6 @@
 import logging
 import os
+from dataclasses import asdict
 from pathlib import Path
 from typing import Tuple
 
@@ -11,6 +12,7 @@ from flax.struct import PyTreeNode
 from jax import numpy as jnp
 from jax import sharding as shx
 from jax import tree_util as trx
+from jax._src.tree_util import DictKey
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.random import PRNGKeyArray
@@ -21,6 +23,13 @@ from ds.utils import Batch
 from training.model import GPT, GPTConfig
 from training.state import DynamicLossScale, TrainState
 from training.utils import Policy, TrainMetrics, get_time_string
+
+GPTS_CONFIG = {
+    "gpt2": dict(num_layers=12, num_heads=12, embd_dim=768),  # 124M params
+    "gpt2-medium": dict(num_layers=24, num_heads=16, embd_dim=1024),  # 350M params
+    "gpt2-large": dict(num_layers=36, num_heads=20, embd_dim=1280),  # 774M params
+    "gpt2-xl": dict(num_layers=48, num_heads=25, embd_dim=1600),  # 1558M params
+}
 
 
 class Trainer:
@@ -153,8 +162,8 @@ class Trainer:
     def _make_optimizer(self, params: PyTreeNode) -> optax.MultiSteps:
         def _to_decay(p):
             is_embeddings = (
-                p.shape == params["token_embeddings"]["embedding"].shape
-                or p.shape == params["positional_embeddings"]["embedding"].shape
+                p.shape == params["wte"]["embedding"].shape
+                or p.shape == params["wpe"]["embedding"].shape
             )
             is_flat = p.ndim < 2
 
@@ -343,4 +352,36 @@ class Trainer:
         self.checkpointer.wait_until_finished()
 
     def restore_openai_gpt(self):
-        pass
+        from transformers import GPT2LMHeadModel
+
+        def _move(path, _):
+            hf_path = path
+            if path[-1].key in {"kernel", "scale", "embedding"}:
+                hf_path = path[:-1] + (DictKey("weight"),)
+
+            params = jnp.asarray(
+                a=hf_params["transformer." + ".".join([p.key for p in hf_path])],
+                dtype=self.policy.param_dtype,
+            )
+            if path[-1].key == "kernel":
+                params = params.T
+
+            return params
+
+        assert self.config.gpt_type in {"gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl"}
+        self.config = Config(
+            **{
+                **asdict(self.config),
+                **GPTS_CONFIG[self.config.gpt_type],
+                "vocab_size": 50257,
+                "block_size": 1024,
+                "use_bias": True,
+            }
+        )
+
+        model_hf = GPT2LMHeadModel.from_pretrained(self.config.gpt_type)
+        hf_params = model_hf.state_dict()
+        model, params = self._make_model(params_key=jax.random.PRNGKey(0))
+        _ = jax.tree_util.tree_map_with_path(_move, params)
+        print(f"loading weights from pretrained gpt: {self.config.gpt_type}")
+        print("forcing vocab_size=50257, block_size=1024, bias=True")

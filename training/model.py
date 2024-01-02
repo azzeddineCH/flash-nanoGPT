@@ -38,7 +38,10 @@ class CasualAttention(nn.Module):
 
         head_dim = embd_dim // self.num_heads
         qkv = HiddenDense(
-            embd_dim * 3, use_bias=self.use_bias, param_dtype=self.param_dtype
+            embd_dim * 3,
+            use_bias=self.use_bias,
+            param_dtype=self.param_dtype,
+            name="c_attn",
         )(x)
         qkv = qkv.reshape(batch, seq_length, 3 * self.num_heads, head_dim)
         q, k, v = jnp.split(qkv, indices_or_sections=3, axis=2)
@@ -68,7 +71,10 @@ class CasualAttention(nn.Module):
 
         proj_dense = make_dense(kernel_init_std=0.02 / self.proj_kernel_init_norm)
         post_projection_attn_embeddings = proj_dense(
-            embd_dim, use_bias=self.use_bias, param_dtype=self.param_dtype
+            embd_dim,
+            use_bias=self.use_bias,
+            param_dtype=self.param_dtype,
+            name="c_proj",
         )(attn_embeddings)
 
         # batch, seq_length, embd_dim
@@ -93,12 +99,16 @@ class MLP(nn.Module):
             self.input_factor * embd_dim,
             use_bias=self.use_bias,
             param_dtype=self.param_dtype,
+            name="c_fc",
         )(x)
 
         x = nn.activation.gelu(x)
 
         x = make_dense(kernel_init_std=0.02 / self.proj_kernel_init_norm)(
-            embd_dim, use_bias=self.use_bias, param_dtype=self.param_dtype
+            embd_dim,
+            use_bias=self.use_bias,
+            param_dtype=self.param_dtype,
+            name="c_proj",
         )(x)
 
         x = nn.Dropout(rate=self.dropout_rate)(x, deterministic=not train)
@@ -108,23 +118,31 @@ class MLP(nn.Module):
 
 class AttentionBlock(nn.Module):
     use_bias: bool = True
+    dropout_rate: float = 0.2
     proj_kernel_init_norm: float = 1.0
     reduce_ops_dtype: jnp.dtype = jnp.float32
     param_dtype: jnp.dtype = jnp.float32
 
     def setup(self):
-        self.l1 = LayerNorm(use_bias=self.use_bias, param_dtype=self.param_dtype)
+        self.l1 = LayerNorm(
+            use_bias=self.use_bias, param_dtype=self.param_dtype, name="ln_1"
+        )
         self.attention = CasualAttention(
             use_bias=self.use_bias,
+            dropout_rate=self.dropout_rate,
             proj_kernel_init_norm=self.proj_kernel_init_norm,
             reduce_ops_dtype=self.reduce_ops_dtype,
             param_dtype=self.param_dtype,
+            name="attn",
         )
-        self.l2 = LayerNorm(use_bias=self.use_bias, param_dtype=self.param_dtype)
+        self.l2 = LayerNorm(
+            use_bias=self.use_bias, param_dtype=self.param_dtype, name="ln_2"
+        )
         self.mlp = MLP(
             use_bias=self.use_bias,
             proj_kernel_init_norm=self.proj_kernel_init_norm,
             param_dtype=self.param_dtype,
+            dropout_rate=self.dropout_rate,
         )
 
     def __call__(self, x, train=True):
@@ -163,29 +181,34 @@ class GPT(nn.Module):
             features=self.config.embd_dim,
             embedding_init=normal_initializer(std=0.02),
             param_dtype=self.config.param_dtype,
+            name="wte",
         )
         self.positional_embeddings = nn.Embed(
             num_embeddings=self.config.block_size,
             features=self.config.embd_dim,
             embedding_init=normal_initializer(std=0.02),
             param_dtype=self.config.param_dtype,
+            name="wpe",
         )
 
         self.dropout = nn.Dropout(self.config.dropout_rate)
 
         self.blocks = [
             AttentionBlock(
+                dropout_rate=self.config.dropout_rate,
                 use_bias=self.config.use_bias,
                 proj_kernel_init_norm=jnp.sqrt(2 * self.config.num_layers),
                 reduce_ops_dtype=self.config.reduce_ops_dtype,
                 param_dtype=self.config.param_dtype,
+                name=f"h.{i}",
             )
-            for _ in range(self.config.num_layers)
+            for i in range(self.config.num_layers)
         ]
 
         self.layer_norm = LayerNorm(
             use_bias=self.config.use_bias,
             param_dtype=self.config.param_dtype,
+            name="ln_f",
         )
 
     def __call__(self, x, *, train=True, top_k=None):

@@ -11,6 +11,7 @@ class Config:
     eval_num_steps: int
     save_checkpoint: bool
     restore: str  # scratch | pre-trained | gpt
+    gpt_type: str  # gpt2 | gpt2-medium | gpt2-large | gpt2-xl
     checkpoint_dir: str
     log_freq: int
     wandb: bool

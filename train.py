@@ -15,7 +15,7 @@ from training.utils import TrainMetrics
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 # ============= Init tpu pod ============= #
-jax.distributed.initialize()
+# jax.distributed.initialize()
 
 if jax.process_index() == 0:
     logging.info(
@@ -48,7 +48,7 @@ if config.restore == "scratch":
 elif config.restore == "pre-trained":
     train_state, best_valid_loss = trainer.restore()
     start_iter = train_state.step + 1
-elif config.restore == "gpt-2":
+elif config.restore == "openai":
     train_state = trainer.restore_openai_gpt()
     raise ValueError(f"unknown restore method {config.restore}")
 
