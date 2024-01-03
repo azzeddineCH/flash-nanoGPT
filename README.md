@@ -5,18 +5,29 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 
 ## Todos
 
-- [x] GPT model in flax
-- [x] Core data pipeline
-- [x] Core training loop
-- [x] Mixed precision training
-- [x] Gradient accumulation
-- [x] Data sharding across GPUs/TPUs
+- [x] GPT2 alike model in flax
+- [x] Mixed precision training with jmp
+- [x] Gradient accumulation with optax
+- [x] Data sharding across GPUs/TPUs using the new Jax shmap
 - [x] Loading and Saving checkpoints
 - [x] Reproduce the results on shakespear-char dataset
-- [x] TF Record reader/write with support for GCP bucket
+- [x] TF Record reader/writer with support for data sharding across hosts
 - [x] Multi-host training
 - [ ] Reproducing results on OpenWebText dataset
-- [ ] Loading GPTs pre-trained models
+- [x] Loading GPTs pre-trained models
 - [ ] Fine tuning GPT-2 weights on Shakespear dataset
-- [ ] Profiling/Benchmarking and speeding up iteration
+- [ ] Profiling training iteration, estimating MFU (Model flops utilization)
+- [ ] Optimizing Inference
 - [ ] Flash attention with Pallas
+
+## Future work
+
+- Experimenting with Jax tensor sharding
+- Experimenting with advanced fine-tuning techniques
+- ...
+
+## Acknowledgement
+...
+
+## References
+

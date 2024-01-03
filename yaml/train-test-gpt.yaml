@@ -12,6 +12,7 @@ wandb_project_name: "flash-nano-gpt"
 wandb_run_id: "test-gpt"
 # data
 dataset_dir: "data/shakespeare"
+document_dataset: false
 vocab_size: 50304
 grad_accum_steps: 1
 batch_size: 32

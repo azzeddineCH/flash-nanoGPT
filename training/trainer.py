@@ -200,20 +200,20 @@ class Trainer:
 
         return optimizer
 
-    def make_train_state(self, state_key: PRNGKeyArray) -> TrainState:
-        model, params = self._make_model(state_key)
-
-        optimizer = self._make_optimizer(params)
-
+    def _make_loss_scale(self):
         scale = jmp.NoOpLossScale()
         if self.config.amp and not self.on_tpu:
             scale = DynamicLossScale(jnp.asarray(2.0**15, dtype=jnp.float32))
 
+        return scale
+
+    def make_train_state(self, state_key: PRNGKeyArray) -> TrainState:
+        model, params = self._make_model(state_key)
         state = TrainState.create(
             apply_fn=model.apply,
             params=params,
-            tx=optimizer,
-            loss_scale=scale,
+            tx=self._make_optimizer(params),
+            loss_scale=self._make_loss_scale(),
             skip_infinite=self.config.skip_infinite,
         )
 
@@ -354,7 +354,7 @@ class Trainer:
     def restore_openai_gpt(self):
         from transformers import GPT2LMHeadModel
 
-        def _move(path, _):
+        def _copy(path, _):
             hf_path = path
             if path[-1].key in {"kernel", "scale", "embedding"}:
                 hf_path = path[:-1] + (DictKey("weight"),)
@@ -382,6 +382,12 @@ class Trainer:
         model_hf = GPT2LMHeadModel.from_pretrained(self.config.gpt_type)
         hf_params = model_hf.state_dict()
         model, params = self._make_model(params_key=jax.random.PRNGKey(0))
-        _ = jax.tree_util.tree_map_with_path(_move, params)
-        print(f"loading weights from pretrained gpt: {self.config.gpt_type}")
-        print("forcing vocab_size=50257, block_size=1024, bias=True")
+        params = jax.tree_util.tree_map_with_path(_copy, params)
+
+        return TrainState.create(
+            apply_fn=model.apply,
+            params=params,
+            tx=self._make_optimizer(params),
+            loss_scale=self._make_loss_scale(),
+            skip_infinite=self.config.skip_infinite,
+        )

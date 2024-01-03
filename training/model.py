@@ -25,12 +25,12 @@ LayerNorm = partial(nn.LayerNorm, epsilon=1e-5, use_scale=True)
 
 
 class CasualAttention(nn.Module):
-    dropout_rate: float = 0.2
-    num_heads: int = 8
-    use_bias: bool = True
-    proj_kernel_init_norm: float = 1.0
-    reduce_ops_dtype: jnp.dtype = jnp.float32
-    param_dtype: jnp.dtype = jnp.float32
+    dropout_rate: float
+    num_heads: int
+    use_bias: bool
+    proj_kernel_init_norm: float
+    reduce_ops_dtype: jnp.dtype
+    param_dtype: jnp.dtype
 
     @nn.compact
     def __call__(self, x, *, train=True):
@@ -86,11 +86,11 @@ class CasualAttention(nn.Module):
 
 
 class MLP(nn.Module):
-    input_factor: int = 4
-    dropout_rate: float = 0.2
-    use_bias: bool = True
-    proj_kernel_init_norm: int = 1
-    param_dtype: jnp.dtype = jnp.float32
+    input_factor: int
+    dropout_rate: float
+    use_bias: bool
+    proj_kernel_init_norm: float
+    param_dtype: jnp.dtype
 
     @nn.compact
     def __call__(self, x, train=True):
@@ -117,17 +117,19 @@ class MLP(nn.Module):
 
 
 class AttentionBlock(nn.Module):
-    use_bias: bool = True
-    dropout_rate: float = 0.2
-    proj_kernel_init_norm: float = 1.0
-    reduce_ops_dtype: jnp.dtype = jnp.float32
-    param_dtype: jnp.dtype = jnp.float32
+    num_heads: int
+    use_bias: bool
+    dropout_rate: float
+    proj_kernel_init_norm: float
+    reduce_ops_dtype: jnp.dtype
+    param_dtype: jnp.dtype
 
     def setup(self):
         self.l1 = LayerNorm(
             use_bias=self.use_bias, param_dtype=self.param_dtype, name="ln_1"
         )
         self.attention = CasualAttention(
+            num_heads=self.num_heads,
             use_bias=self.use_bias,
             dropout_rate=self.dropout_rate,
             proj_kernel_init_norm=self.proj_kernel_init_norm,
@@ -139,6 +141,7 @@ class AttentionBlock(nn.Module):
             use_bias=self.use_bias, param_dtype=self.param_dtype, name="ln_2"
         )
         self.mlp = MLP(
+            input_factor=4,
             use_bias=self.use_bias,
             proj_kernel_init_norm=self.proj_kernel_init_norm,
             param_dtype=self.param_dtype,
@@ -161,15 +164,15 @@ class AttentionBlock(nn.Module):
 
 @dataclass
 class GPTConfig:
-    block_size: int = 1024
-    vocab_size: int = 50304  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    num_layers: int = 12
-    num_heads: int = 12
-    embd_dim: int = 768
-    dropout_rate: float = 0.0
-    use_bias: bool = True  # True: bias in Dense and LayerNorms, like GPT-2. False: a bit better and faster
-    reduce_ops_dtype: jnp.dtype = jnp.float32
-    param_dtype: jnp.dtype = jnp.float32
+    block_size: int
+    vocab_size: int  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+    num_layers: int
+    num_heads: int
+    embd_dim: int
+    dropout_rate: float
+    use_bias: bool  # True: bias in Dense and LayerNorms, like GPT-2. False: a bit better and faster
+    reduce_ops_dtype: jnp.dtype
+    param_dtype: jnp.dtype
 
 
 class GPT(nn.Module):
@@ -195,6 +198,7 @@ class GPT(nn.Module):
 
         self.blocks = [
             AttentionBlock(
+                num_heads=self.config.num_heads,
                 dropout_rate=self.config.dropout_rate,
                 use_bias=self.config.use_bias,
                 proj_kernel_init_norm=jnp.sqrt(2 * self.config.num_layers),
@@ -249,28 +253,3 @@ class GPT(nn.Module):
             context = jnp.concatenate([context, next_token[..., None]], axis=-1)
 
         return context
-
-
-if __name__ == "__main__":
-    key = jax.random.PRNGKey(0)
-
-    config = GPTConfig(
-        block_size=32,
-        num_layers=8,
-        num_heads=4,
-        embd_dim=128,
-        dropout_rate=0.0,
-        use_bias=False,
-    )
-
-    random_input = jax.random.randint(key, (2, 8), minval=0, maxval=config.vocab_size)
-
-    model = GPT(config)
-    state = model.init(key, x=random_input, train=False)
-    output = model.apply(state, x=random_input, train=False)
-
-    assert output.shape == random_input.shape + (config.vocab_size,)
-
-    tokens = jax.jit(model.generate, static_argnums=(3,))(
-        key, state["params"], context=random_input, max_new_tokens=10
-    )

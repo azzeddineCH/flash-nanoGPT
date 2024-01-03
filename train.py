@@ -49,8 +49,9 @@ elif config.restore == "pre-trained":
     train_state, best_valid_loss = trainer.restore()
     start_iter = train_state.step + 1
 elif config.restore == "openai":
+    logging.info(f"loading weights from pretrained gpt: {config.gpt_type}")
+    logging.info("forcing vocab_size=50257, block_size=1024, use_bias=True")
     train_state = trainer.restore_openai_gpt()
-    raise ValueError(f"unknown restore method {config.restore}")
 
 if jax.process_index() == 0:
     logging.info(f"Train state created | model parameters : {train_state.num_params}")
@@ -65,6 +66,7 @@ train_data_iter = DataLoader(
     buffer_size=config.buffer_size,
     num_shards=jax.process_count(),
     shard=jax.process_index(),
+    documents_dataset=config.document_dataset,
 ).get_iterator()
 
 validation_data_iter = DataLoader(
@@ -76,6 +78,7 @@ validation_data_iter = DataLoader(
     buffer_size=config.buffer_size,
     num_shards=jax.process_count(),
     shard=jax.process_index(),
+    documents_dataset=config.document_dataset,
 ).get_iterator()
 
 # ============= Training Loop ============= #

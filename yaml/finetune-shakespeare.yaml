@@ -3,7 +3,7 @@
 eval_freq: 250
 eval_num_steps: 200
 save_checkpoint: false
-restore: "scratch"  # scratch | pre-trained | gpt
+restore: "openai"  # scratch | pre-trained | openai
 gpt_type: "gpt2"
 checkpoint_dir: "checkpoints"
 log_freq: 10
@@ -11,7 +11,7 @@ wandb: true
 wandb_project_name: "flash-nano-gpt"
 wandb_run_id: "shakespeare-char-gpt"
 # data
-dataset_dir: "gs://flash-nano-gpt-bucket/data/shakespeare-char"
+dataset_dir: "gs://flash-nano-gpt-bucket/data/shakespeare"
 vocab_size: 65
 grad_accum_steps: 1
 batch_size: 64

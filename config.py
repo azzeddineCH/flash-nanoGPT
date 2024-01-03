@@ -19,6 +19,7 @@ class Config:
     wandb_run_id: str
     # data
     dataset_dir: str
+    document_dataset: bool
     vocab_size: int
     batch_size: int
     block_size: int
@@ -50,7 +51,7 @@ class Config:
 
 
 def get_default_config():
-    config_path = os.environ.get("GPT_CONFIG_PATH", "yaml/test-gpt.yaml")
+    config_path = os.environ.get("GPT_CONFIG_PATH", "yaml/train-test-gpt.yaml")
     assert os.path.exists(
         config_path
     ), f"Can't find env variable 'gpt-config-path', f{config_path}"

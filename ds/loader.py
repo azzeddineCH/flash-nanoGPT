@@ -17,6 +17,7 @@ class DataLoader:
         num_workers: int = tf.data.AUTOTUNE,
         buffer_size: int = 5,
         prefetch: int = 2,
+        documents_dataset: bool = False,
     ):
         self.directory = directory
         self.split = split
@@ -28,7 +29,7 @@ class DataLoader:
         self.num_workers = num_workers
         self.buffer_size = buffer_size
         self.prefetch = prefetch
-
+        self.documents_dataset = documents_dataset
         self.dataset = self._load()
 
     def _load(self):
@@ -51,7 +52,14 @@ class DataLoader:
             .repeat(
                 # repeat the dataset inf
             )
-            .unbatch()
+        )
+
+        if self.documents_dataset:
+            # shuffle documents as it is the case for openwebtext dataset
+            dataset = dataset.shuffle(self.buffer_size)
+
+        dataset = (
+            dataset.unbatch()
             .batch(
                 # un-batch the blocks to form a single sequence then
                 # batch it by block_size + 1 ( add one to consider the last prediction)

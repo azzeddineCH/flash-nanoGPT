@@ -12,6 +12,7 @@ wandb_project_name: "flash-nano-gpt"
 wandb_run_id: "nano-gpt"
 # data
 dataset_dir: "gs://flash-nano-gpt-bucket/data/openwebtext"
+document_dataset: true
 vocab_size: 50304
 grad_accum_steps: 1
 batch_size: 512
