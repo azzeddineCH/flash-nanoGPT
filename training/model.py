@@ -69,8 +69,9 @@ class CasualAttention(nn.Module):
             (batch, seq_length, -1)
         )
 
-        proj_dense = make_dense(kernel_init_std=0.02 / self.proj_kernel_init_norm)
-        post_projection_attn_embeddings = proj_dense(
+        post_projection_attn_embeddings = make_dense(
+            kernel_init_std=0.02 / self.proj_kernel_init_norm
+        )(
             embd_dim,
             use_bias=self.use_bias,
             param_dtype=self.param_dtype,
