@@ -32,7 +32,7 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 in order to run training using TPU VM, copy the generated data files into a GCP bucket
 
 ## Acknowledgement
-Big thanks for [TPU Research Cloud](https://sites.research.google/trc/about/) for providing v2-8/v3-8/v3-32 TPU instances on Google Cloud.
+Big thanks to [TPU Research Cloud](https://sites.research.google/trc/about/) for providing v2-8/v3-8/v3-32 TPU instances on Google Cloud.
 
 ## References
 - Original nanoGPT repositories [[1]](https://github.com/karpathy/nanoGPT)
