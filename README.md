@@ -13,9 +13,10 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] Reproduce the results on shakespear-char dataset
 - [x] TF Record reader/writer with support for data sharding across hosts
 - [x] Multi-host training
-- [ ] Reproducing results on OpenWebText dataset
-- [x] Loading GPTs pre-trained models
+- [x] Reproducing results on OpenWebText dataset
+- [x] Loading huggingface GPTs pre-trained models
 - [ ] Fine tuning GPT-2 weights on Shakespear dataset
+- [ ] Fix a bug with saving checkpoints using orbax on TPU VM
 - [ ] Profiling training iteration, estimating MFU (Model flops utilization)
 - [ ] Optimizing Inference
 - [ ] Flash attention with Pallas
@@ -23,11 +24,19 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 ## Future work
 
 - Experimenting with Jax tensor sharding
-- Experimenting with advanced fine-tuning techniques
+- Gradient checkpointing
+- Experimenting with fine-tuning techniques
 - ...
 
+## data generation
+in order to run training using TPU VM, copy the generated data files into a GCP bucket
+
 ## Acknowledgement
-...
+Big thanks for [TPU Research Cloud](https://sites.research.google/trc/about/) for providing v2-8/v3-8/v3-32 TPU instances on Google Cloud.
 
 ## References
+- Original nanoGPT repositories [[1]](https://github.com/karpathy/nanoGPT)
+- jax based nanoGPT repositories [[1]](https://github.com/jenkspt/gpt-jax?tab=readme-ov-file) [[2]](https://github.com/cgarciae/nanoGPT-jax)
+- Nvidia mixed precision training [[1]](https://docs.nvidia.com/deeplearning/performance/mixed-precision-training/index.html)
+- Google Cloud documentation [[1]](https://cloud.google.com/tpu/docs/)
 
