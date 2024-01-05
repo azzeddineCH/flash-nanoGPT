@@ -12,7 +12,8 @@ wandb_project_name: "flash-nano-gpt"
 wandb_run_id: "shakespeare-finetune"
 # data
 dataset_dir: "gs://flash-nano-gpt-bucket/data/shakespeare"
-vocab_size: 65
+document_dataset: false
+vocab_size: 50304
 grad_accum_steps: 32
 batch_size: 32
 block_size: 1024
