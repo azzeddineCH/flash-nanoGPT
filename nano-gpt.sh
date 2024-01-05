@@ -86,7 +86,7 @@ gcloud compute tpus tpu-vm ssh flash-nano-gpt-tpu-vm\
     cd flash-nanoGPT
     tmux new -d -s nano-gpt '
      export GPT_CONFIG_PATH='yaml/train-nano-gpt.yaml'
-     export WANDB_API_KEY='1358c41f476d22803205a19c793f3f6c344c9e0b'
+     export WANDB_API_KEY='...'
      git pull
      python3 train.py --no-save-checkpoint --no-amp
     '
