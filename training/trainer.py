@@ -1,6 +1,5 @@
 import logging
 import os
-from dataclasses import asdict
 from pathlib import Path
 from typing import Tuple
 
@@ -25,10 +24,42 @@ from training.state import DynamicLossScale, TrainState
 from training.utils import Policy, TrainMetrics, get_time_string
 
 GPTS_CONFIG = {
-    "gpt2": dict(num_layers=12, num_heads=12, embd_dim=768),  # 124M params
-    "gpt2-medium": dict(num_layers=24, num_heads=16, embd_dim=1024),  # 350M params
-    "gpt2-large": dict(num_layers=36, num_heads=20, embd_dim=1280),  # 774M params
-    "gpt2-xl": dict(num_layers=48, num_heads=25, embd_dim=1600),  # 1558M params
+    # 124M params
+    "gpt2": dict(
+        num_layers=12,
+        num_heads=12,
+        embd_dim=768,
+        vocab_size=50257,
+        block_size=1024,
+        use_bias=True,
+    ),
+    # 350M params
+    "gpt2-medium": dict(
+        num_layers=24,
+        num_heads=16,
+        embd_dim=1024,
+        vocab_size=50257,
+        block_size=1024,
+        use_bias=True,
+    ),
+    # 774M params
+    "gpt2-large": dict(
+        num_layers=36,
+        num_heads=20,
+        embd_dim=1280,
+        vocab_size=50257,
+        block_size=1024,
+        use_bias=True,
+    ),
+    # 1558M params
+    "gpt2-xl": dict(
+        num_layers=48,
+        num_heads=25,
+        embd_dim=1600,
+        vocab_size=50257,
+        block_size=1024,
+        use_bias=True,
+    ),
 }
 
 
@@ -354,30 +385,21 @@ class Trainer:
     def restore_openai_gpt(self):
         from transformers import GPT2LMHeadModel
 
-        def _copy(path, _):
+        def _copy(path, ph):
             hf_path = path
             if path[-1].key in {"kernel", "scale", "embedding"}:
                 hf_path = path[:-1] + (DictKey("weight"),)
+            name = "transformer." + ".".join([p.key for p in hf_path])
 
             params = jnp.asarray(
-                a=hf_params["transformer." + ".".join([p.key for p in hf_path])],
+                a=hf_params[name],
                 dtype=self.policy.param_dtype,
             )
-            if path[-1].key == "kernel":
-                params = params.T
 
+            assert (
+                params.shape == ph.shape
+            ), f"expected {ph.shape}, got {params.shape} for {name}"
             return params
-
-        assert self.config.gpt_type in {"gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl"}
-        self.config = Config(
-            **{
-                **asdict(self.config),
-                **GPTS_CONFIG[self.config.gpt_type],
-                "vocab_size": 50257,
-                "block_size": 1024,
-                "use_bias": True,
-            }
-        )
 
         model_hf = GPT2LMHeadModel.from_pretrained(self.config.gpt_type)
         hf_params = model_hf.state_dict()

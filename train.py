@@ -9,13 +9,13 @@ import tyro
 import wandb
 from config import Config, get_default_config
 from ds.loader import DataLoader
-from training.trainer import Trainer
+from training.trainer import GPTS_CONFIG, Trainer
 from training.utils import TrainMetrics
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 # ============= Init tpu pod ============= #
-# jax.distributed.initialize()
+# jax.distributed.initialize() todo: enable it if running on TPU VM
 
 if jax.process_index() == 0:
     logging.info(
@@ -24,6 +24,14 @@ if jax.process_index() == 0:
 
 # ============= Init configs ============= #
 config = tyro.cli(Config, default=get_default_config())
+if config.restore == "openai":
+    assert config.gpt_type in {"gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl"}
+    config = Config(
+        **{
+            **dataclasses.asdict(config),
+            **GPTS_CONFIG[config.gpt_type],
+        }
+    )
 
 # ============= Init Logging ============= #
 if config.wandb and jax.process_index() == 0:

@@ -14,7 +14,7 @@ wandb_run_id: "shakespeare-finetune"
 dataset_dir: "gs://flash-nano-gpt-bucket/data/shakespeare"
 document_dataset: false
 vocab_size: 50304
-grad_accum_steps: 32
+grad_accum_steps: 1
 batch_size: 32
 block_size: 1024
 buffer_size: 5
