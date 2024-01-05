@@ -15,11 +15,11 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] Multi-host training
 - [x] Reproducing results on OpenWebText dataset
 - [x] Loading huggingface GPTs pre-trained models
-- [ ] Fine tuning GPT-2 weights on Shakespear dataset
-- [ ] Fix a bug with saving checkpoints using orbax on TPU VM
+- [x] Fine tuning GPT-2 weights on Shakespear dataset
 - [ ] Profiling training iteration, estimating MFU (Model flops utilization)
 - [ ] Optimizing Inference
 - [ ] Flash attention with Pallas
+- [ ] Fix a bug with saving checkpoints using orbax on TPU VM
 
 ## Future work
 
