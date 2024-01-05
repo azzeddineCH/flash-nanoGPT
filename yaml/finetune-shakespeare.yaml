@@ -1,7 +1,7 @@
 !dataclass:Config
 # checkpoint and eval
-eval_freq: 250
-eval_num_steps: 200
+eval_freq: 5
+eval_num_steps: 40
 save_checkpoint: false
 restore: "openai"  # scratch | pre-trained | openai
 gpt_type: "gpt2"
@@ -9,31 +9,31 @@ checkpoint_dir: "checkpoints"
 log_freq: 10
 wandb: true
 wandb_project_name: "flash-nano-gpt"
-wandb_run_id: "shakespeare-char-gpt"
+wandb_run_id: "shakespeare-finetune"
 # data
 dataset_dir: "gs://flash-nano-gpt-bucket/data/shakespeare"
 vocab_size: 65
-grad_accum_steps: 1
-batch_size: 64
-block_size: 256
+grad_accum_steps: 32
+batch_size: 32
+block_size: 1024
 buffer_size: 5
 prefetch: 2
 # model
-num_layers: 6
-num_heads: 6
-embd_dim: 384
-dropout_rate: 0.2
+num_layers: 12
+num_heads: 12
+embd_dim: 768
+dropout_rate: 0.0
 use_bias: false
 # Optimizer
-num_iters: 5000
-lr: 0.001
-lr_decay: true
-lr_warmup_iters: 100
-lr_decay_iters: 5000
-lr_min: 0.0001
+num_iters: 600000
+lr: 0.00003
+lr_decay: false
+lr_warmup_iters: 2000
+lr_decay_iters: 600000
+lr_min: 0.00006
 weight_decay: 0.1
 beta1: 0.9
-beta2: 0.99
+beta2: 0.95
 grad_clip: 1.0
 # training
 seed: 0
