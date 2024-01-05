@@ -211,7 +211,7 @@ class Trainer:
 
         # ============= use "inject_hyperparams" in order to track the learning rate ============= #
         optimizer = optax.inject_hyperparams(optax.adamw)(
-            learning_rate=schedule,
+            learning_rate=schedule if self.config.lr_decay else self.config.lr,
             b1=self.config.beta1,
             b2=self.config.beta2,
             weight_decay=self.config.weight_decay,

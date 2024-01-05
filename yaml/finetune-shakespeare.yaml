@@ -17,7 +17,7 @@ vocab_size: 50304
 grad_accum_steps: 1
 batch_size: 32
 block_size: 1024
-buffer_size: 5
+buffer_size: 128
 prefetch: 2
 # model
 num_layers: 12
