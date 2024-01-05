@@ -134,7 +134,7 @@ for _ in range(start_iter, config.num_iters):
                 wandb.log(
                     {
                         "iter": train_state.step,
-                        "train_loss": train_state.loss,
+                        "train_loss": train_metrics.loss,
                         "train_dataset_loss": train_loss,
                         "valid_dataset_loss": valid_loss,
                         "lr": train_state.lr,
