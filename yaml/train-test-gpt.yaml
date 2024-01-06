@@ -41,3 +41,8 @@ seed: 0
 amp: false
 skip_infinite: true
 jit: false
+# sampling
+samples_dir: "data/sampling"
+num_samples: 10
+max_new_tokens: 100
+temperature: 1

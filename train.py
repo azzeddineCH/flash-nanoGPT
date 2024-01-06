@@ -10,12 +10,11 @@ import wandb
 from config import Config, get_default_config
 from ds.loader import DataLoader
 from training.trainer import GPTS_CONFIG, Trainer
-from training.utils import TrainMetrics
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 # ============= Init tpu pod ============= #
-# jax.distributed.initialize() todo: enable it if running on TPU VM
+# run "jax.distributed.initialize()" it if running on TPU VM
 
 if jax.process_index() == 0:
     logging.info(
@@ -128,7 +127,7 @@ for _ in range(start_iter, config.num_iters):
                 f"iter: {train_state.step} | val loss {valid_loss} | train loss {train_loss}"
             )
             if config.save_checkpoint:
-                trainer.save(train_state, metrics=TrainMetrics(loss=valid_loss))
+                trainer.save(train_state, loss=valid_loss)
 
             if config.wandb:
                 wandb.log(

@@ -1,7 +1,7 @@
 import logging
-import os
+from functools import partial
 from pathlib import Path
-from typing import Tuple
+from typing import Callable, Tuple
 
 import jax
 import jmp
@@ -15,13 +15,13 @@ from jax._src.tree_util import DictKey
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.random import PRNGKeyArray
-from orbax.checkpoint.utils import is_gcs_path
+from orbax.checkpoint.checkpoint_utils import construct_restore_args
 
 from config import Config
 from ds.utils import Batch
 from training.model import GPT, GPTConfig
 from training.state import DynamicLossScale, TrainState
-from training.utils import Policy, TrainMetrics, get_time_string
+from training.utils import Policy, TrainMetrics
 
 GPTS_CONFIG = {
     # 124M params
@@ -134,21 +134,11 @@ class Trainer:
         )
 
         # ============= Checkpointing ============= #
-
-        ckpt_dir = os.path.join(
-            self.config.checkpoint_dir,
-            f"{self.config.wandb_run_id}-{get_time_string()}",
-        )
-        if not is_gcs_path(ckpt_dir):
-            ckpt_dir = Path(ckpt_dir)
-            ckpt_dir.mkdir(exist_ok=True, parents=True)
-            ckpt_dir = ckpt_dir.absolute()
-
         self.checkpointer = ocp.CheckpointManager(
-            ckpt_dir,
+            Path(self.config.checkpoint_dir).absolute(),
             checkpointers=dict(
                 state=ocp.PyTreeCheckpointer(),
-                train_metrics=ocp.PyTreeCheckpointer(),
+                valid_loss=ocp.Checkpointer(ocp.ArrayCheckpointHandler()),
             ),
             options=ocp.CheckpointManagerOptions(
                 max_to_keep=2,
@@ -352,32 +342,60 @@ class Trainer:
         loss = self._loss(rng_key, params, state, batch, train=False)
         return jax.lax.pmean(loss, axis_name="data")
 
-    def save(self, state: TrainState, metrics: TrainMetrics):
+    def save(self, state: TrainState, loss: jax.Array):
         saved = self.checkpointer.save(
             state.step,
             items=dict(
                 state=state,
-                train_metrics=metrics,
+                valid_loss=loss,
             ),
-            metrics=dict(loss=float(metrics.loss)),
+            metrics=dict(loss=float(loss)),
         )
 
         if saved:
             logging.info(f"checkpoint saved ...{state.step}")
 
     def restore(self) -> Tuple:
+        train_state, valid_loss = jax.device_put(
+            (self.make_train_state(state_key=jax.random.PRNGKey(0)), 0),
+            device=jax.sharding.NamedSharding(self.device_mesh, self.replicated_specs),
+        )
+
+        train_state_sharding, metrics_sharding = jax.tree_map(
+            lambda x: x.sharding, (train_state, valid_loss)
+        )
         ckpt = self.checkpointer.restore(
             self.checkpointer.best_step(),
             items=dict(
-                state=self.make_train_state(state_key=jax.random.PRNGKey(0)),
-                train_metrics=TrainMetrics(loss=0),
+                state=train_state,
+                valid_loss=valid_loss,
+            ),
+            restore_kwargs=dict(
+                state=dict(
+                    restore_args=construct_restore_args(
+                        train_state, train_state_sharding
+                    )
+                ),
+                valid_loss=dict(
+                    restore_args=construct_restore_args(valid_loss, metrics_sharding)
+                ),
             ),
         )
 
-        state = ckpt["state"]
-        loss = ckpt["train_metrics"].loss
+        return ckpt["state"], ckpt["valid_loss"]
 
-        return state, loss
+    def make_sampling_fn(
+        self, train_state: TrainState, max_new_tokens: int, temperature: float
+    ) -> Callable:
+        fn = partial(
+            train_state.apply_fn,
+            params=train_state.params,
+            method_name="generate",
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+        )
+
+        return jax.jit(fn) if self.config.jit else fn
 
     def close(self):
         self.checkpointer.wait_until_finished()
