@@ -2,10 +2,10 @@
 # checkpoint and eval
 eval_freq: 5
 eval_num_steps: 40
-save_checkpoint: false
+save_checkpoint: true
 restore: "openai"  # scratch | pre-trained | openai
 gpt_type: "gpt2"
-checkpoint_dir: "checkpoints"
+checkpoint_dir: "gs://flash-nano-gpt-bucket/checkpoints/finetune-shakespeare"
 log_freq: 10
 wandb: true
 wandb_project_name: "flash-nano-gpt"
