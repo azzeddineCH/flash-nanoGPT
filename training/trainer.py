@@ -16,6 +16,7 @@ from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.random import PRNGKeyArray
 from orbax.checkpoint.checkpoint_utils import construct_restore_args
+from orbax.checkpoint.utils import is_gcs_path
 
 from config import Config
 from ds.utils import Batch
@@ -134,8 +135,14 @@ class Trainer:
         )
 
         # ============= Checkpointing ============= #
+        ckpt_dir = self.config.checkpoint_dir
+        if not is_gcs_path(ckpt_dir):
+            ckpt_dir = Path(ckpt_dir)
+            ckpt_dir.mkdir(exist_ok=True, parents=True)
+            ckpt_dir = ckpt_dir.absolute()
+
         self.checkpointer = ocp.CheckpointManager(
-            Path(self.config.checkpoint_dir).absolute(),
+            ckpt_dir,
             checkpointers=dict(
                 step=ocp.Checkpointer(ocp.ArrayCheckpointHandler()),
                 params=ocp.PyTreeCheckpointer(),
