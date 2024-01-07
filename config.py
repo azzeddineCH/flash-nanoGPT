@@ -43,6 +43,7 @@ class Config:
     beta2: float
     grad_clip: float
     # training
+    device: str
     grad_accum_steps: int
     amp: bool
     skip_infinite: bool

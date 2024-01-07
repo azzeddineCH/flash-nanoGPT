@@ -68,9 +68,9 @@ class Trainer:
         self.config = config
 
         # ============= Mixed Precision Policy ============= #
-        self.on_tpu = jax.local_devices()[0].platform == "tpu"
+        assert jax.local_devices(backend=self.config.device)
 
-        if self.config.amp and self.on_tpu:
+        if self.config.amp and self.config.device == "tpu":
             # when training on TPUs with bflaot16 there is no need for mixed precision
             # as each multiply-accumulate operation in a matrix multiplication
             # uses bfloat16 for the multiplication and 32-bit IEEE floating point for accumulation.
@@ -137,7 +137,9 @@ class Trainer:
         self.checkpointer = ocp.CheckpointManager(
             Path(self.config.checkpoint_dir).absolute(),
             checkpointers=dict(
-                state=ocp.PyTreeCheckpointer(),
+                step=ocp.Checkpointer(ocp.ArrayCheckpointHandler()),
+                params=ocp.PyTreeCheckpointer(),
+                opt_state=ocp.PyTreeCheckpointer(),
                 valid_loss=ocp.Checkpointer(ocp.ArrayCheckpointHandler()),
             ),
             options=ocp.CheckpointManagerOptions(
@@ -149,7 +151,8 @@ class Trainer:
 
     def _make_device_mesh(self) -> shx.Mesh:
         devices = mesh_utils.create_device_mesh(
-            mesh_shape=(jax.local_device_count(),), devices=jax.local_devices()
+            mesh_shape=(jax.local_device_count(self.config.device),),
+            devices=jax.local_devices(backend=self.config.device),
         )
         mesh = shx.Mesh(devices, axis_names=("data",))
         return mesh
@@ -223,7 +226,7 @@ class Trainer:
 
     def _make_loss_scale(self):
         scale = jmp.NoOpLossScale()
-        if self.config.amp and not self.on_tpu:
+        if self.config.amp and not self.config.device == "tpu":
             scale = DynamicLossScale(jnp.asarray(2.0**15, dtype=jnp.float32))
 
         return scale
@@ -346,7 +349,9 @@ class Trainer:
         saved = self.checkpointer.save(
             state.step,
             items=dict(
-                state=state,
+                step=state.step,
+                params=state.params,
+                opt_state=state.opt_state,
                 valid_loss=loss,
             ),
             metrics=dict(loss=float(loss)),
@@ -358,7 +363,7 @@ class Trainer:
     def restore(self) -> Tuple:
         train_state, valid_loss = jax.device_put(
             (self.make_train_state(state_key=jax.random.PRNGKey(0)), 0),
-            device=jax.sharding.NamedSharding(self.device_mesh, self.replicated_specs),
+            device=shx.NamedSharding(self.device_mesh, self.replicated_specs),
         )
 
         train_state_sharding, metrics_sharding = jax.tree_map(
@@ -367,13 +372,25 @@ class Trainer:
         ckpt = self.checkpointer.restore(
             self.checkpointer.best_step(),
             items=dict(
-                state=train_state,
+                step=train_state.step,
+                params=train_state.params,
+                opt_state=train_state.opt_state,
                 valid_loss=valid_loss,
             ),
             restore_kwargs=dict(
-                state=dict(
+                step=dict(
                     restore_args=construct_restore_args(
-                        train_state, train_state_sharding
+                        train_state.step, train_state_sharding.step
+                    )
+                ),
+                params=dict(
+                    restore_args=construct_restore_args(
+                        train_state.params, train_state_sharding.params
+                    )
+                ),
+                opt_state=dict(
+                    restore_args=construct_restore_args(
+                        train_state.opt_state, train_state_sharding.opt_state
                     )
                 ),
                 valid_loss=dict(
@@ -382,7 +399,13 @@ class Trainer:
             ),
         )
 
-        return ckpt["state"], ckpt["valid_loss"]
+        train_state = train_state.replace(
+            step=ckpt["step"],
+            params=ckpt["params"],
+            opt_state=ckpt["opt_state"],
+        )
+
+        return train_state, ckpt["valid_loss"]
 
     def make_sampling_fn(
         self, train_state: TrainState, max_new_tokens: int, temperature: float

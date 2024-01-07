@@ -37,6 +37,7 @@ beta1: 0.9
 beta2: 0.95
 grad_clip: 1.0
 # training
+device: "tpu" # cpu | gpu | tpu
 seed: 2024 # happy new year !
 amp: true
 skip_infinite: true
