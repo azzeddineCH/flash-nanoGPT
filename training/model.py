@@ -239,7 +239,7 @@ class GPT(nn.Module):
 
         return logits
 
-    def generate(self, rng_key, params, context, max_new_tokens, temperature=0.1):
+    def generate(self, rng_key, context, max_new_tokens, temperature=0.1):
         for i in range(max_new_tokens):
             token_key = jax.random.fold_in(rng_key, i)
             trunc_context = (
@@ -247,9 +247,7 @@ class GPT(nn.Module):
                 if context.shape[-1] <= self.config.block_size
                 else context[:, -self.config.block_size :]
             )
-            logits = self.apply(
-                {"params": params}, x=trunc_context, train=False, top_k=1
-            )[:, -1, :]
+            logits = self(x=trunc_context, train=False, top_k=1)[:, -1, :]
             next_token = jax.random.categorical(token_key, logits / temperature)
             context = jnp.concatenate([context, next_token[..., None]], axis=-1)
 

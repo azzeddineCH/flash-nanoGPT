@@ -419,8 +419,8 @@ class Trainer:
     ) -> Callable:
         fn = partial(
             train_state.apply_fn,
-            params=train_state.params,
-            method_name="generate",
+            variables={"params": train_state.params},
+            method="generate",
             max_new_tokens=max_new_tokens,
             temperature=temperature,
         )
