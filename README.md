@@ -16,7 +16,7 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] Reproducing results on OpenWebText dataset
 - [x] Loading huggingface GPTs pre-trained models
 - [x] Fine tuning GPT-2 weights on Shakespear dataset
-- [ ] Sampling
+- [x] Sampling
 - [ ] Estimating MFU (Model flops utilization)
 - [ ] Profiling training iteration,
 - [ ] Optimizing Inference
