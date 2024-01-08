@@ -43,11 +43,17 @@ class Config:
     beta2: float
     grad_clip: float
     # training
+    device: str
     grad_accum_steps: int
     amp: bool
     skip_infinite: bool
     jit: bool
     seed: int
+    # sampling
+    samples_dir: str
+    num_samples: int
+    max_new_tokens: int
+    temperature: int
 
 
 def get_default_config():

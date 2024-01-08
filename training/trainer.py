@@ -1,7 +1,7 @@
 import logging
-import os
+from functools import partial
 from pathlib import Path
-from typing import Tuple
+from typing import Callable, Tuple
 
 import jax
 import jmp
@@ -15,13 +15,14 @@ from jax._src.tree_util import DictKey
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.random import PRNGKeyArray
+from orbax.checkpoint.checkpoint_utils import construct_restore_args
 from orbax.checkpoint.utils import is_gcs_path
 
 from config import Config
 from ds.utils import Batch
 from training.model import GPT, GPTConfig
 from training.state import DynamicLossScale, TrainState
-from training.utils import Policy, TrainMetrics, get_time_string
+from training.utils import Policy, TrainMetrics
 
 GPTS_CONFIG = {
     # 124M params
@@ -68,9 +69,9 @@ class Trainer:
         self.config = config
 
         # ============= Mixed Precision Policy ============= #
-        self.on_tpu = jax.local_devices()[0].platform == "tpu"
+        assert jax.local_devices(backend=self.config.device)
 
-        if self.config.amp and self.on_tpu:
+        if self.config.amp and self.config.device == "tpu":
             # when training on TPUs with bflaot16 there is no need for mixed precision
             # as each multiply-accumulate operation in a matrix multiplication
             # uses bfloat16 for the multiplication and 32-bit IEEE floating point for accumulation.
@@ -134,11 +135,7 @@ class Trainer:
         )
 
         # ============= Checkpointing ============= #
-
-        ckpt_dir = os.path.join(
-            self.config.checkpoint_dir,
-            f"{self.config.wandb_run_id}-{get_time_string()}",
-        )
+        ckpt_dir = self.config.checkpoint_dir
         if not is_gcs_path(ckpt_dir):
             ckpt_dir = Path(ckpt_dir)
             ckpt_dir.mkdir(exist_ok=True, parents=True)
@@ -147,8 +144,10 @@ class Trainer:
         self.checkpointer = ocp.CheckpointManager(
             ckpt_dir,
             checkpointers=dict(
-                state=ocp.PyTreeCheckpointer(),
-                train_metrics=ocp.PyTreeCheckpointer(),
+                step=ocp.Checkpointer(ocp.ArrayCheckpointHandler()),
+                params=ocp.PyTreeCheckpointer(),
+                opt_state=ocp.PyTreeCheckpointer(),
+                valid_loss=ocp.Checkpointer(ocp.ArrayCheckpointHandler()),
             ),
             options=ocp.CheckpointManagerOptions(
                 max_to_keep=2,
@@ -159,7 +158,8 @@ class Trainer:
 
     def _make_device_mesh(self) -> shx.Mesh:
         devices = mesh_utils.create_device_mesh(
-            mesh_shape=(jax.local_device_count(),), devices=jax.local_devices()
+            mesh_shape=(jax.local_device_count(self.config.device),),
+            devices=jax.local_devices(backend=self.config.device),
         )
         mesh = shx.Mesh(devices, axis_names=("data",))
         return mesh
@@ -233,7 +233,7 @@ class Trainer:
 
     def _make_loss_scale(self):
         scale = jmp.NoOpLossScale()
-        if self.config.amp and not self.on_tpu:
+        if self.config.amp and not self.config.device == "tpu":
             scale = DynamicLossScale(jnp.asarray(2.0**15, dtype=jnp.float32))
 
         return scale
@@ -352,32 +352,80 @@ class Trainer:
         loss = self._loss(rng_key, params, state, batch, train=False)
         return jax.lax.pmean(loss, axis_name="data")
 
-    def save(self, state: TrainState, metrics: TrainMetrics):
+    def save(self, state: TrainState, loss: jax.Array):
         saved = self.checkpointer.save(
             state.step,
             items=dict(
-                state=state,
-                train_metrics=metrics,
+                step=state.step,
+                params=state.params,
+                opt_state=state.opt_state,
+                valid_loss=loss,
             ),
-            metrics=dict(loss=float(metrics.loss)),
+            metrics=dict(loss=float(loss)),
         )
 
         if saved:
             logging.info(f"checkpoint saved ...{state.step}")
 
     def restore(self) -> Tuple:
+        train_state, valid_loss = jax.device_put(
+            (self.make_train_state(state_key=jax.random.PRNGKey(0)), 0),
+            device=shx.NamedSharding(self.device_mesh, self.replicated_specs),
+        )
+
+        train_state_sharding, metrics_sharding = jax.tree_map(
+            lambda x: x.sharding, (train_state, valid_loss)
+        )
         ckpt = self.checkpointer.restore(
             self.checkpointer.best_step(),
             items=dict(
-                state=self.make_train_state(state_key=jax.random.PRNGKey(0)),
-                train_metrics=TrainMetrics(loss=0),
+                step=train_state.step,
+                params=train_state.params,
+                opt_state=train_state.opt_state,
+                valid_loss=valid_loss,
+            ),
+            restore_kwargs=dict(
+                step=dict(
+                    restore_args=construct_restore_args(
+                        train_state.step, train_state_sharding.step
+                    )
+                ),
+                params=dict(
+                    restore_args=construct_restore_args(
+                        train_state.params, train_state_sharding.params
+                    )
+                ),
+                opt_state=dict(
+                    restore_args=construct_restore_args(
+                        train_state.opt_state, train_state_sharding.opt_state
+                    )
+                ),
+                valid_loss=dict(
+                    restore_args=construct_restore_args(valid_loss, metrics_sharding)
+                ),
             ),
         )
 
-        state = ckpt["state"]
-        loss = ckpt["train_metrics"].loss
+        train_state = train_state.replace(
+            step=ckpt["step"],
+            params=ckpt["params"],
+            opt_state=ckpt["opt_state"],
+        )
 
-        return state, loss
+        return train_state, ckpt["valid_loss"]
+
+    def make_sampling_fn(
+        self, train_state: TrainState, max_new_tokens: int, temperature: float
+    ) -> Callable:
+        fn = partial(
+            train_state.apply_fn,
+            variables={"params": train_state.params},
+            method="generate",
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+        )
+
+        return jax.jit(fn) if self.config.jit else fn
 
     def close(self):
         self.checkpointer.wait_until_finished()
