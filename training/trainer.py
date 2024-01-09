@@ -471,7 +471,7 @@ class Trainer:
             self.config.block_size,
         )
         flops_per_token = 6 * num_params + 12 * L * H * E * T
-        flops_per_iter = flops_per_token * self.config.block_size * samples_per_iter
+        flops_per_iter = flops_per_token * T * samples_per_iter
         flops_achieved = flops_per_iter * (1.0 / time_per_iter_s)
         flops_promised = 180e12  # 180 tera flops for TPUv2
         return flops_achieved / flops_promised
