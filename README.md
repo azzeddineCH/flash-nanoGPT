@@ -19,7 +19,6 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] Sampling
 - [x] Estimating MFU (Model flops utilization)
 - [x] Profiling training iteration
-- [ ] Optimizing Inference
 - [ ] Flash attention with Pallas
 
 ## Future work
@@ -27,6 +26,7 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - Experimenting with Jax tensor sharding
 - Gradient checkpointing
 - Experimenting with fine-tuning techniques
+- Optimizing Inference
 - ...
 
 ## data generation
