@@ -5,8 +5,7 @@ gcloud compute tpus tpu-vm create flash-nano-gpt-tpu \
   --accelerator-type=v2-8 \
   --version=tpu-ubuntu2204-base
 
- gcloud compute tpus tpu-vm ssh flash-nano-gpt-tpu \
-  --zone=us-central1-f
+ gcloud compute tpus tpu-vm ssh flash-nano-gpt-tpu --zone=us-central1-f  -- -L 6006:127.0.0.1:6006
 
 gcloud compute tpus tpu-vm ssh flash-nano-gpt-tpu \
   --zone=us-central1-f \
