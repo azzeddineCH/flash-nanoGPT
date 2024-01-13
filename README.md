@@ -18,7 +18,7 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] Fine tuning GPT-2 weights on Shakespear dataset
 - [x] Sampling
 - [x] Estimating MFU (Model flops utilization)
-- [ ] Profiling training iteration,
+- [x] Profiling training iteration
 - [ ] Optimizing Inference
 - [ ] Flash attention with Pallas
 
