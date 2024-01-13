@@ -17,6 +17,7 @@ gcloud compute tpus tpu-vm ssh flash-nano-gpt-tpu \
     pip install orbax-checkpoint
     pip install tiktoken
     pip install tensorflow
+    pip install tensorboard-plugin-profile
     pip install flax
     pip install optax
     pip install git+https://github.com/deepmind/jmp
