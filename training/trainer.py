@@ -461,3 +461,18 @@ class Trainer:
             loss_scale=self._make_loss_scale(),
             skip_infinite=self.config.skip_infinite,
         )
+
+    def estimate_mfu(self, train_state, samples_per_iter, time_per_iter_s):
+        num_params = int(train_state.num_params)
+        L, H, Q, T = (
+            self.config.num_layers,
+            self.config.num_heads,
+            self.config.embd_dim // self.config.num_heads,
+            self.config.block_size,
+        )
+        flops_per_token = 6 * num_params + 12 * L * H * Q * T
+        flops_per_fwdbwd = flops_per_token * T
+        flops_per_iter = flops_per_fwdbwd * samples_per_iter
+        flops_achieved = flops_per_iter * (1.0 / time_per_iter_s)
+        flops_promised = 180e12  # 180 tera flops for TPUv2
+        return flops_achieved / flops_promised

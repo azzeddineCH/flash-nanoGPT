@@ -5,8 +5,8 @@ import time
 
 import jax
 import tyro
-
 import wandb
+
 from config import Config, get_default_config
 from ds.loader import DataLoader
 from training.trainer import GPTS_CONFIG, Trainer
@@ -101,6 +101,11 @@ for _ in range(start_iter, config.num_iters):
         training_step_key, train_state, train_batch
     )
     step_time_ms = (time.time() - t0) * 1000
+    step_mfu = trainer.estimate_mfu(
+        train_state,
+        samples_per_iter=config.batch_size // jax.process_count(),
+        time_per_iter_s=step_time_ms / 1000,
+    )
 
     # ============= Evaluation ============= #
     if train_state.step == 1 or train_state.step % config.eval_freq == 0:
@@ -141,6 +146,7 @@ for _ in range(start_iter, config.num_iters):
                         "grads_gnorm": train_metrics.grads_gnorm,
                         "params_gnorm": train_metrics.params_gnorm,
                         "time_ms": step_time_ms if train_state.step > 1 else 0,
+                        "mfu": step_mfu,
                     },
                     step=train_state.step,
                     commit=True,
@@ -151,7 +157,7 @@ for _ in range(start_iter, config.num_iters):
         train_state.step == 1 or train_state.step % config.log_freq == 0
     ) and jax.process_index() == 0:
         logging.info(
-            f"iter: {train_state.step} | loss: {train_metrics.loss} | time_ms: {step_time_ms}"
+            f"iter: {train_state.step} | loss: {train_metrics.loss} | time_ms: {step_time_ms} | mfu {step_mfu}"
         )
 
 if jax.process_index() == 0:
