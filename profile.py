@@ -45,11 +45,16 @@ batch = jax.random.randint(
 iter_key = jax.random.fold_in(training_key, train_state.step)
 training_step_key, iter_key = jax.random.split(iter_key, 2)
 
+logging.info("Compiling...")
+training_step_fn = trainer.training_step.lower(
+    training_step_key, train_state, Batch(inputs=batch, labels=batch)
+).compile()
+
 logging.info("Running iteration...")
 with jax.profiler.trace("./tensorboard"):
     for i in range(10):
         t0 = time.time()
-        trainer.training_step(
+        training_step_fn(
             training_step_key, train_state, Batch(inputs=batch, labels=batch)
         )
         step_time_ms = (time.time() - t0) * 1000
