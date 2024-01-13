@@ -5,8 +5,8 @@ import time
 
 import jax
 import tyro
-
 import wandb
+
 from config import Config, get_default_config
 from ds.loader import DataLoader
 from training.trainer import GPTS_CONFIG, Trainer
@@ -104,7 +104,7 @@ for _ in range(start_iter, config.num_iters):
     step_mfu = trainer.estimate_mfu(
         train_state,
         samples_per_iter=config.batch_size // jax.process_count(),
-        time_per_iter_s=step_time_ms // 1000,
+        time_per_iter_s=step_time_ms / 1000,
     )
 
     # ============= Evaluation ============= #
