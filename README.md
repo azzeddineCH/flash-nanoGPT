@@ -21,14 +21,6 @@ Pallas kernel language for flashAttention on TPU, Data and tensor sharding with 
 - [x] Profiling training iteration
 - [ ] Flash attention with Pallas
 
-## Future work
-
-- Experimenting with Jax tensor sharding
-- Gradient checkpointing
-- Experimenting with fine-tuning techniques
-- Optimizing Inference
-- ...
-
 ## data generation
 in order to run training using TPU VM, copy the generated data files into a GCP bucket
 
